@@ -5,9 +5,13 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 const app = new Hono();
 
 const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
-  if (!context.userId) return false;
+  const user =
+    context.userId
+      ? await reddit.getUserById(context.userId)
+      : context.username
+        ? await reddit.getUserByUsername(context.username)
+        : undefined;
 
-  const user = await reddit.getUserById(context.userId);
   if (!user) return false;
 
   const permissions = await user.getModPermissionsForSubreddit(subredditName);
