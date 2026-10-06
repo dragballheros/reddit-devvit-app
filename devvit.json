@@ -11,6 +11,24 @@
       }
     }
   },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Example Post",
+        "description": "Create a new AnimeH34 Portal Demo custom post for testing and review.",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/create-post"
+      }
+    ]
+  },
+  "permissions": {
+    "reddit": true
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build"
