@@ -152,30 +152,13 @@ button { font: inherit; }
   z-index: 5;
   pointer-events: none;
   border-radius: inherit;
-  padding: 2px;
-  background:
-    conic-gradient(
-      from 0deg,
-      transparent 0deg 18deg,
-      color-mix(in srgb, var(--portal-accent) 12%, transparent) 24deg,
-      color-mix(in srgb, var(--portal-accent) 96%, white) 38deg,
-      white 48deg,
-      color-mix(in srgb, var(--portal-accent) 70%, transparent) 62deg,
-      transparent 78deg 154deg,
-      color-mix(in srgb, var(--portal-accent) 70%, transparent) 166deg,
-      color-mix(in srgb, var(--portal-accent) 96%, white) 184deg,
-      transparent 202deg 290deg,
-      color-mix(in srgb, var(--portal-accent) 90%, white) 308deg,
-      transparent 326deg 360deg
-    );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  filter:
-    drop-shadow(0 0 4px color-mix(in srgb, var(--portal-accent) 78%, transparent))
-    drop-shadow(0 0 12px color-mix(in srgb, var(--portal-accent) 30%, transparent));
-  animation: portal-ring 5.2s linear infinite;
-  animation-delay: calc(var(--portal-index) * -0.35s);
+  border: 2px solid color-mix(in srgb, var(--portal-accent) 72%, white 8%);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--portal-accent) 34%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--portal-accent) 10%, transparent);
+  opacity: 0.82;
+  animation: portal-outline 3.8s ease-in-out infinite alternate;
+  animation-delay: calc(var(--portal-index) * -0.22s);
 }
 
 .portal-button::after {
@@ -355,6 +338,21 @@ button { font: inherit; }
 
 @keyframes portal-ring {
   to { transform: rotate(360deg); }
+}
+
+@keyframes portal-outline {
+  from {
+    opacity: 0.62;
+    box-shadow:
+      0 0 8px color-mix(in srgb, var(--portal-accent) 26%, transparent),
+      inset 0 0 12px color-mix(in srgb, var(--portal-accent) 7%, transparent);
+  }
+  to {
+    opacity: 0.96;
+    box-shadow:
+      0 0 18px color-mix(in srgb, var(--portal-accent) 48%, transparent),
+      inset 0 0 20px color-mix(in srgb, var(--portal-accent) 13%, transparent);
+  }
 }
 
 @keyframes portal-breathe {
