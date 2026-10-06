@@ -18,8 +18,8 @@
   "menu": {
     "items": [
       {
-        "label": "Create Example Post",
-        "description": "Create a new AnimeH34 Portal Demo custom post for testing and review.",
+        "label": "Create HentaiApp Post",
+        "description": "Create a new HentaiApp custom post for testing and review.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-post"
