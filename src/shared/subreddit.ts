@@ -42,10 +42,14 @@ export const APP_CONFIG: AppConfig = {
   },
   portals: {
     animeh34: {
+      background:
+        'https://styles.redditmedia.com/t5_8885uq/styles/mobileBannerImage_omhpdnktxjqh1.png',
       icon: '/portals/AnimeH34Icon.png',
       accent: '#ff5ca8',
     },
     discord: {
+      background:
+        'https://www.scenichudson.org/wp-content/uploads/2024/12/DSC_9302-Enhanced-NR-1400x933.jpg',
       icon: '/portals/AnimeH34Icon.png',
       accent: '#f0be46',
     },
