@@ -17,10 +17,7 @@ const INTRO_DURATION_MS = 1900;
 const MOBILE_INTRO_DURATION_MS = 1900;
 
 const pickRandomItem = (items: string[], fallback: string) => {
-  if (items.length === 0) {
-    return fallback;
-  }
-
+  if (items.length === 0) return fallback;
   const index = Math.floor(Math.random() * items.length);
   return items[index] ?? fallback;
 };
@@ -46,22 +43,14 @@ const getMobileSnapshot = () => {
   const orientationMatch = orientationType.includes('portrait');
   const clientMatch = context.client?.name === 'ANDROID' || context.client?.name === 'IOS';
 
-  return (
-    uaMatch ||
-    portrait ||
-    orientationMatch ||
-    clientMatch ||
-    Boolean(uaMobile)
-  );
+  return uaMatch || portrait || orientationMatch || clientMatch || Boolean(uaMobile);
 };
 
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(getMobileSnapshot);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    if (typeof window === 'undefined') return;
 
     const media = window.matchMedia ? window.matchMedia('(max-width: 600px)') : null;
     const coarse = window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
@@ -93,28 +82,50 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-const MenuButton = ({
-  label,
-  onClick,
-  onMouseEnter,
-}: {
+type PortalButtonProps = {
   label: string;
   onClick: () => void;
+  background?: string;
+  icon?: string;
+  accent?: string;
   onMouseEnter?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
-}) => {
+};
+
+const PortalButton = ({
+  label,
+  onClick,
+  background,
+  icon,
+  accent = '#ffffff',
+  onMouseEnter,
+}: PortalButtonProps) => {
   return (
-    <button className="glow-button" onClick={onClick} onMouseEnter={onMouseEnter}>
-      <span className="glow-button__label" aria-label={label}>
-        {Array.from(label).map((char, index) => (
-          <span
-            key={`${label}-${char}-${index}`}
-            className="button-text-letter"
-            style={{ animationDelay: `${index * 0.05}s` }}
-          >
-            {char === ' ' ? '\u00A0' : char}
-          </span>
-        ))}
+    <button
+      className="portal-button"
+      style={{ '--portal-accent': accent } as React.CSSProperties}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      aria-label={label}
+    >
+      <span
+        className="portal-button__background"
+        style={background ? { backgroundImage: `url("${background}")` } : undefined}
+        aria-hidden="true"
+      />
+      <span className="portal-button__shade" aria-hidden="true" />
+      <span className="portal-button__icon-shell" aria-hidden="true">
+        {icon ? (
+          <img className="portal-button__icon" src={icon} alt="" />
+        ) : (
+          <span className="portal-button__icon-placeholder" />
+        )}
       </span>
+      <span className="portal-button__content">
+        <span className="portal-button__label">{label}</span>
+        <span className="portal-button__line" aria-hidden="true" />
+      </span>
+      <span className="portal-button__energy portal-button__energy--one" aria-hidden="true" />
+      <span className="portal-button__energy portal-button__energy--two" aria-hidden="true" />
     </button>
   );
 };
@@ -129,9 +140,9 @@ export const MenuApp = () => {
       ? APP_CONFIG.introGifMobileVariants ?? [APP_CONFIG.introGifMobile]
       : APP_CONFIG.introGifDesktopVariants ?? [APP_CONFIG.introGifDesktop];
     const fallback = isMobile ? APP_CONFIG.introGifMobile : APP_CONFIG.introGifDesktop;
-
     return pickRandomItem(variants, fallback);
   }, [isMobile]);
+
   const subGridRef = useRef<HTMLDivElement | null>(null);
   const subsPanelRef = useRef<HTMLDivElement | null>(null);
   const subsPointerActivatedRef = useRef(false);
@@ -146,14 +157,11 @@ export const MenuApp = () => {
   useEffect(() => {
     const duration = isMobile ? MOBILE_INTRO_DURATION_MS : INTRO_DURATION_MS;
     const timer = setTimeout(() => setIsIntroHidden(true), duration);
-    return () => {
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [isMobile]);
 
   useEffect(() => {
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
-
     if (view === 'subs') {
       subsOpenedAtRef.current = Date.now();
       resetTimer = setTimeout(() => setIsMobileSubsResetting(false), 0);
@@ -161,43 +169,78 @@ export const MenuApp = () => {
       subsPointerActivatedRef.current = false;
       resetTimer = setTimeout(() => setIsMobileSubsResetting(false), 0);
     }
-
     return () => {
-      if (resetTimer) {
-        clearTimeout(resetTimer);
-      }
+      if (resetTimer) clearTimeout(resetTimer);
     };
   }, [view]);
 
-  const menuButtons = useMemo(
+  const mainPortals = useMemo(
     () => [
-      { label: 'Discord', onClick: () => navigateTo(APP_CONFIG.links.discord) },
-      { label: 'Modmail', onClick: () => navigateTo(modmailLink) },
-      { label: 'X / Twitter', onClick: () => navigateTo(APP_CONFIG.links.twitter) },
-      { label: 'Other Subreddits', onClick: () => setView('subs') },
+      {
+        label: 'AnimeH34 Discord',
+        background: APP_CONFIG.portals.discord.background,
+        icon: APP_CONFIG.portals.discord.icon,
+        accent: '#f0be46',
+        onClick: () => navigateTo(APP_CONFIG.links.discord),
+      },
+      {
+        label: 'Modmail',
+        background: APP_CONFIG.portals.modmail.background,
+        icon: APP_CONFIG.portals.modmail.icon,
+        accent: '#72bfff',
+        onClick: () => navigateTo(modmailLink),
+      },
+      {
+        label: 'x.com/ElfariaNSFW',
+        background: APP_CONFIG.portals.x.background,
+        icon: APP_CONFIG.portals.x.icon,
+        accent: '#f2f2f4',
+        onClick: () => navigateTo(APP_CONFIG.links.twitter),
+      },
+      {
+        label: 'Other Subreddits',
+        background: undefined,
+        icon: undefined,
+        accent: '#b18cff',
+        onClick: () => setView('subs'),
+      },
+      {
+        label: 'Create Post',
+        background: undefined,
+        icon: undefined,
+        accent: '#b18cff',
+        onClick: () =>
+          navigateTo(
+            `https://www.reddit.com/r/${currentSubredditName || 'hentai'}/submit`
+          ),
+      },
     ],
-    [modmailLink]
+    [currentSubredditName, modmailLink]
   );
 
-  const subButtons = useMemo(
+  const subPortals = useMemo(
     () =>
       APP_CONFIG.links.otherSubreddits
         .filter((subreddit) => subreddit !== currentSubredditName)
-        .map((subreddit) => ({
-          label: `r/${subreddit}`,
-          onClick: () => navigateTo(`https://www.reddit.com/r/${subreddit}`),
-        })),
+        .map((subreddit) => {
+          const key = normalizeSubredditName(subreddit) as keyof typeof APP_CONFIG.portals.subreddits;
+          const portal = APP_CONFIG.portals.subreddits[key];
+          return {
+            label: subreddit === 'AnimeH34' ? 'AnimeH34' : subreddit,
+            background: portal?.background,
+            icon: portal?.icon,
+            accent: portal?.accent ?? '#b18cff',
+            onClick: () => navigateTo(`https://www.reddit.com/r/${subreddit}`),
+          };
+        }),
     [currentSubredditName]
   );
 
-  const buttons = view === 'main' ? menuButtons : subButtons;
+  const buttons = view === 'main' ? mainPortals : subPortals;
 
   const ensureButtonVisible = (button: HTMLButtonElement) => {
     const container = subGridRef.current;
-
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
     const buttonTop = button.offsetTop;
     const buttonBottom = buttonTop + button.offsetHeight;
@@ -210,9 +253,7 @@ export const MenuApp = () => {
       return;
     }
 
-    if (!canUseBackDownHover()) {
-      return;
-    }
+    if (!canUseBackDownHover()) return;
 
     if (buttonBottom + padding > viewBottom) {
       container.scrollTo({
@@ -224,21 +265,13 @@ export const MenuApp = () => {
 
   const scrollSubsToTop = () => {
     const container = subGridRef.current;
-
-    if (!container || !canUseBackDownHover()) {
-      return;
-    }
-
+    if (!container || !canUseBackDownHover()) return;
     container.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const scrollSubsToBottom = () => {
     const container = subGridRef.current;
-
-    if (!container || !canUseBackDownHover()) {
-      return;
-    }
-
+    if (!container || !canUseBackDownHover()) return;
     container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   };
 
@@ -247,33 +280,20 @@ export const MenuApp = () => {
 
   const isNearSubsBottom = () => {
     const container = subGridRef.current;
-
-    if (!container) {
-      return false;
-    }
-
-    const buttons = container.querySelectorAll<HTMLButtonElement>('.glow-button');
+    if (!container) return false;
+    const buttons = container.querySelectorAll<HTMLButtonElement>('.portal-button');
     const lastButton = buttons[buttons.length - 1];
-
-    if (!lastButton) {
-      return false;
-    }
-
+    if (!lastButton) return false;
     const viewBottom = container.scrollTop + container.clientHeight;
     const lastButtonBottom = lastButton.offsetTop + lastButton.offsetHeight;
-
     return lastButtonBottom <= viewBottom;
   };
 
   useEffect(() => {
     const node = subGridRef.current;
-
-    if (!node || isMobile || view !== 'subs') {
-      return;
-    }
+    if (!node || isMobile || view !== 'subs') return;
 
     node.scrollTop = 0;
-
     let frameId = 0;
     let currentScroll = 0;
     let targetScroll = 0;
@@ -286,10 +306,8 @@ export const MenuApp = () => {
 
     const handleMove = (event: MouseEvent) => {
       subsPointerActivatedRef.current = true;
-
       const rect = node.getBoundingClientRect();
       const maxScroll = Math.max(0, node.scrollHeight - node.clientHeight);
-
       const relativeY = (event.clientY - rect.top) / rect.height;
       const clamped = Math.max(0, Math.min(1, relativeY));
       const edgeThreshold = 0.14;
@@ -298,12 +316,10 @@ export const MenuApp = () => {
         targetScroll = 0;
         return;
       }
-
       if (clamped <= edgeThreshold) {
         targetScroll = 0;
         return;
       }
-
       if (clamped >= 1 - edgeThreshold) {
         targetScroll = maxScroll;
         return;
@@ -318,26 +334,21 @@ export const MenuApp = () => {
     };
 
     frameId = window.requestAnimationFrame(tick);
-    const hoverTarget = node;
-    hoverTarget.addEventListener('mousemove', handleMove);
-    hoverTarget.addEventListener('mouseleave', handleLeave);
+    node.addEventListener('mousemove', handleMove);
+    node.addEventListener('mouseleave', handleLeave);
 
     return () => {
       window.cancelAnimationFrame(frameId);
-      hoverTarget.removeEventListener('mousemove', handleMove);
-      hoverTarget.removeEventListener('mouseleave', handleLeave);
+      node.removeEventListener('mousemove', handleMove);
+      node.removeEventListener('mouseleave', handleLeave);
     };
   }, [isMobile, view]);
 
   useEffect(() => {
     const node = subGridRef.current;
-
-    if (!node || !isMobile || view !== 'subs') {
-      return;
-    }
+    if (!node || !isMobile || view !== 'subs') return;
 
     node.scrollTop = 0;
-
     let frameId = 0;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let resetTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -349,17 +360,11 @@ export const MenuApp = () => {
       const pixelsPerSecond = 34;
 
       const tick = (timestamp: number) => {
-        if (isCancelled) {
-          return;
-        }
-
-        if (!lastTimestamp) {
-          lastTimestamp = timestamp;
-        }
+        if (isCancelled) return;
+        if (!lastTimestamp) lastTimestamp = timestamp;
 
         const deltaSeconds = (timestamp - lastTimestamp) / 1000;
         lastTimestamp = timestamp;
-
         const maxScroll = Math.max(0, node.scrollHeight - node.clientHeight);
         const nextScrollTop = Math.min(
           maxScroll,
@@ -390,12 +395,8 @@ export const MenuApp = () => {
     return () => {
       isCancelled = true;
       window.cancelAnimationFrame(frameId);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      if (resetTimeoutId) {
-        clearTimeout(resetTimeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
+      if (resetTimeoutId) clearTimeout(resetTimeoutId);
       clearTimeout(resetStateTimer);
     };
   }, [isMobile, view, buttons.length]);
@@ -436,10 +437,7 @@ export const MenuApp = () => {
                   ))}
                 </span>
               </button>
-              <button
-                className="mobile__tab"
-                onClick={() => setView('subs')}
-              >
+              <button className="mobile__tab" onClick={() => setView('subs')}>
                 <span className="mobile__tab-label" aria-label="Subs">
                   {Array.from('Subs').map((char, index) => (
                     <span
@@ -462,14 +460,17 @@ export const MenuApp = () => {
           >
             <div
               ref={view === 'subs' ? subGridRef : null}
-              className={`menu__grid ${view === 'subs' ? 'menu__grid--scroll' : ''} ${
+              className={`menu__grid portal-grid ${view === 'subs' ? 'menu__grid--scroll' : ''} ${
                 view === 'subs' && isMobileSubsResetting ? 'menu__grid--mobile-resetting' : ''
               }`}
             >
               {buttons.map((button) => (
-                <MenuButton
+                <PortalButton
                   key={button.label}
                   label={button.label}
+                  background={button.background}
+                  icon={button.icon}
+                  accent={button.accent}
                   onClick={button.onClick}
                   {...(view === 'subs' && !isMobile
                     ? {
@@ -491,7 +492,6 @@ export const MenuApp = () => {
                           scrollSubsToTop();
                           return;
                         }
-
                         if (
                           subsPointerActivatedRef.current &&
                           canUseSubsEdgeHover() &&
@@ -506,12 +506,10 @@ export const MenuApp = () => {
                   view === 'subs' && !isMobile
                     ? () => {
                         subsPointerActivatedRef.current = true;
-
                         if (!canUseBackDownHover()) {
                           scrollSubsToTop();
                           return;
                         }
-
                         if (canUseSubsEdgeHover() && isNearSubsBottom()) {
                           scrollSubsToBottom();
                         }
@@ -519,14 +517,14 @@ export const MenuApp = () => {
                     : undefined
                 }
                 onMouseLeave={
-                  view === 'subs' && !isMobile
-                    ? () => {
-                        scrollSubsToTop();
-                      }
-                    : undefined
+                  view === 'subs' && !isMobile ? () => scrollSubsToTop() : undefined
                 }
               >
-                <MenuButton label="Back" onClick={() => setView('main')} />
+                <PortalButton
+                  label="Back"
+                  onClick={() => setView('main')}
+                  accent="#ffffff"
+                />
               </div>
             ) : null}
           </div>
