@@ -1,34 +1,20 @@
-# hentaiapp recovery
+# Devvit Navigation Experience
 
-Recovered from the deployed `hentaiapp` v0.1.2 WebView.
+A clean, professional navigation experience for your subreddit. It presents a branded welcome screen that transitions into a menu of key community links and destinations, optimized for clarity, accessibility, and quick discovery. Focused purely on navigation and community routing.
 
-## Exact recovery
+## Getting Started
 
-The uploaded source map contains the original `sourcesContent` for:
+> Make sure you have Node 24 or newer installed before running!
 
-- `src/client/MenuApp.tsx`
-- `src/shared/subreddit.ts`
-
-The MHTML capture supplies:
-
-- the production `MenuApp.css`
-- the captured `intro-hentai-desktop.gif`
-
-The compiled `MenuApp.js` and its source map are also preserved under `public/`.
-
-## Caveat
-
-The recovered source references additional mobile/alternate GIF paths. The supplied MHTML captured only the desktop intro asset, so those remaining media assets are not claimed as recovered yet.
-
-`devvit.json`, `vite.config.ts`, `tsconfig.json`, and `src/client/splash.tsx` are a current Devvit Web wrapper around the recovered application source. They are not claimed to be the original lost wrapper files.
+1. Run `npm create devvit@latest --template=react`
+2. Go through the installation wizard. You will need to create a Reddit account and connect it to Reddit developers
+3. Copy the command on the success page into your terminal
 
 ## Commands
 
-```bash
-npm install
-npm run type-check
-npm run build
-npx devvit playtest
-```
-
-Do not publish until the rebuilt project has been compared against the existing `hentaiapp` v0.1.2 deployment.
+- `npm run dev`: Starts a development server where you can develop your application live on Reddit.
+- `npm run build`: Builds your client and server projects
+- `npm run deploy`: Uploads a new version of your app
+- `npm run launch`: Publishes your app for review
+- `npm run login`: Logs your CLI into Reddit
+- `npm run type-check`: Type checks, lints, and prettifies your app
