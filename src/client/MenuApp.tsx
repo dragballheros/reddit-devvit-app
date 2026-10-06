@@ -17,6 +17,7 @@ type PortalButtonProps = {
   label: string;
   onClick: () => void;
   background?: string;
+  backgroundGradient?: string;
   icon?: string;
   accent?: string;
   index: number;
@@ -76,6 +77,7 @@ const PortalButton = ({
   label,
   onClick,
   background,
+  backgroundGradient,
   icon,
   accent = '#ffffff',
   index,
@@ -88,6 +90,7 @@ const PortalButton = ({
         {
           '--portal-accent': accent,
           '--portal-index': index,
+          '--portal-gradient': backgroundGradient ?? 'linear-gradient(120deg, #111827, #000000)',
         } as React.CSSProperties
       }
       onClick={onClick}
@@ -97,7 +100,7 @@ const PortalButton = ({
     >
       <span
         className={`portal-button__background${background ? '' : ' portal-button__background--empty'}`}
-        style={background ? { backgroundImage: `url("${background}")` } : undefined}
+        style={{ backgroundImage: background ? `${backgroundGradient ?? 'linear-gradient(120deg, #111827, #000000)'}, url("${background}")` : backgroundGradient }}
         aria-hidden="true"
       />
       <span className="portal-button__vignette" aria-hidden="true" />
@@ -152,6 +155,7 @@ export const MenuApp = () => {
         return {
           label: name,
           background: asset?.background,
+          backgroundGradient: asset?.backgroundGradient,
           icon: asset?.icon,
           accent: asset?.accent,
           onClick: () => navigateTo(`https://www.reddit.com/r/${name}/`),
@@ -170,6 +174,7 @@ export const MenuApp = () => {
       {
         label: 'x.com/ElfariaNSFW',
         background: APP_CONFIG.portals.x.background,
+        backgroundGradient: APP_CONFIG.portals.x.backgroundGradient,
         icon: APP_CONFIG.portals.x.icon,
         accent: APP_CONFIG.portals.x.accent,
         onClick: () => navigateTo(APP_CONFIG.links.twitter),
@@ -177,6 +182,7 @@ export const MenuApp = () => {
       {
         label: 'AnimeH34 Discord',
         background: APP_CONFIG.portals.discord.background,
+        backgroundGradient: APP_CONFIG.portals.discord.backgroundGradient,
         icon: APP_CONFIG.portals.discord.icon,
         accent: APP_CONFIG.portals.discord.accent,
         onClick: () => navigateTo(APP_CONFIG.links.discord),
@@ -184,6 +190,7 @@ export const MenuApp = () => {
       {
         label: 'Modmail',
         background: APP_CONFIG.portals.modmail.background,
+        backgroundGradient: APP_CONFIG.portals.modmail.backgroundGradient,
         icon: APP_CONFIG.portals.modmail.icon,
         accent: APP_CONFIG.portals.modmail.accent,
         onClick: () => navigateTo(modmailLink),
