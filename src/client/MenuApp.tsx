@@ -227,6 +227,21 @@ export const MenuApp = () => {
 
     return [
       {
+        label: 'AnimeH34',
+        background: APP_CONFIG.portals.animeh34.background,
+        icon: APP_CONFIG.portals.animeh34.icon,
+        accent: APP_CONFIG.portals.animeh34.accent,
+        onClick: () => navigateTo('https://www.reddit.com/r/AnimeH34/'),
+      },
+      ...subredditPortals,
+      {
+        label: 'x.com/ElfariaNSFW',
+        background: APP_CONFIG.portals.x.background,
+        icon: APP_CONFIG.portals.x.icon,
+        accent: APP_CONFIG.portals.x.accent,
+        onClick: () => navigateTo(APP_CONFIG.links.twitter),
+      },
+      {
         label: 'AnimeH34 Discord',
         background: APP_CONFIG.portals.discord.background,
         icon: APP_CONFIG.portals.discord.icon,
@@ -240,14 +255,6 @@ export const MenuApp = () => {
         accent: APP_CONFIG.portals.modmail.accent,
         onClick: () => navigateTo(modmailLink),
       },
-      {
-        label: 'x.com/ElfariaNSFW',
-        background: APP_CONFIG.portals.x.background,
-        icon: APP_CONFIG.portals.x.icon,
-        accent: APP_CONFIG.portals.x.accent,
-        onClick: () => navigateTo(APP_CONFIG.links.twitter),
-      },
-      ...subredditPortals,
       ...moderatorPostPortal,
     ];
   }, [
