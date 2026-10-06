@@ -107,7 +107,6 @@ const PortalButton = ({
       </span>
       <span className="portal-button__content">
         <span className="portal-button__label">{label}</span>
-        <span className="portal-button__subline">OPEN PORTAL</span>
       </span>
       <span className="portal-button__energy portal-button__energy--one" aria-hidden="true" />
       <span className="portal-button__energy portal-button__energy--two" aria-hidden="true" />
