@@ -100,7 +100,7 @@ const PortalButton = ({
     >
       <span
         className={`portal-button__background${background ? '' : ' portal-button__background--empty'}`}
-        style={{ backgroundImage: background ? `${backgroundGradient ?? 'linear-gradient(120deg, #111827, #000000)'}, url("${background}")` : backgroundGradient }}
+        style={{ backgroundImage: background ? `url("${background}")` : backgroundGradient }}
         aria-hidden="true"
       />
       <span className="portal-button__vignette" aria-hidden="true" />
