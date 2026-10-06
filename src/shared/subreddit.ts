@@ -22,6 +22,7 @@ export type AppConfig = {
     modmail: PortalAsset;
     x: PortalAsset;
     subreddits: Record<string, PortalAsset>;
+    createPost: PortalAsset;
   };
 };
 
@@ -36,7 +37,7 @@ export const APP_CONFIG: AppConfig = {
   links: {
     discord: 'https://discord.com/invite/WeWrKMZEa2',
     twitter: 'https://x.com/ElfariaNSFW',
-    otherSubreddits: ['AnimeH34', 'AlyaNSFW', 'HentaiGIFS', 'DragonBallNSFW', 'AnimeAI'],
+    otherSubreddits: ['AlyaNSFW', 'HentaiGIFS', 'DragonBallNSFW', 'AnimeAI'],
   },
   portals: {
     discord: {
@@ -52,10 +53,6 @@ export const APP_CONFIG: AppConfig = {
       accent: '#f2f2f4',
     },
     subreddits: {
-      animeh34: {
-        icon: '/portals/AnimeH34Icon.png',
-        accent: '#f0be46',
-      },
       alyansfw: {
         background: '/portals/AlyaNSFWBanner.png',
         icon: '/portals/AlyaNSFWIcon.jpg',
@@ -75,6 +72,9 @@ export const APP_CONFIG: AppConfig = {
         icon: '/portals/AnimeAIIcon.jpg',
         accent: '#aa82ff',
       },
+    },
+    createPost: {
+      accent: '#b18cff',
     },
   },
 };
