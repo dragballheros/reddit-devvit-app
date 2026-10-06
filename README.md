@@ -1,45 +1,20 @@
 # HentaiApp
 
-HentaiApp is a subreddit navigation experience built with Reddit's Developer Platform (Devvit). It gives a community one branded custom post that presents a welcome animation and then a clear, mobile-friendly navigation menu for community destinations.
+HentaiApp is a community navigation experience for Reddit. It gives a subreddit a branded custom post that acts as a simple home screen for the community's most useful destinations.
 
-The app is intentionally focused on navigation and community routing. It does not host, mirror, scrape, download, or redistribute the content of the linked communities. The destinations are configured by the app developer and are presented as explicit user-initiated links.
+## Purpose
 
-## Purpose and reviewer notes
+HentaiApp is designed for communities that want one easy-to-use place where members can find related subreddits, community resources, and moderator communication links.
 
-This app is a navigation utility for an existing subreddit community.
+The experience is focused on navigation. It does not replace the destination communities or provide a separate content feed.
 
-The core experience is:
+## How it works
 
-1. A short welcome animation is shown when the custom post opens.
-2. The animation transitions into the navigation menu.
-3. Users choose a destination explicitly by pressing a destination button.
-4. Subreddit destinations open the selected subreddit.
-5. Community resource links such as the configured Discord and X/Twitter destination open only when the user explicitly selects them.
-6. The subreddit moderator menu provides a moderator-only action for creating a new HentaiApp custom post for testing and review.
+When a HentaiApp custom post is opened, users see a short welcome animation followed by the community menu.
 
-The app does **not**:
+The menu provides large, clearly labeled buttons that users can select to open the configured destination. The experience is designed to work on both desktop and mobile Reddit clients.
 
-- automatically post, comment, vote, subscribe, follow, or message users
-- scrape or redistribute content from destination communities
-- provide a mirror of another website or app
-- collect or store personal user information
-- use HTTP Fetch or third-party APIs
-- require users to create an account outside Reddit
-- make automated background changes to subreddit content
-
-The app also does not claim to be operated by, sponsored by, or affiliated with Reddit, Discord, X/Twitter, or any destination community.
-
-## Mature-community scope
-
-The configured destinations may include communities intended for mature audiences. Those destinations remain separate communities with their own moderation, labeling, and access controls.
-
-HentaiApp's function is to provide navigation to configured community destinations. It is not a general-purpose content feed and does not remove or bypass Reddit's labeling, safety, blocking, or age-related controls.
-
-Community moderators should only install and configure the app in communities where the configured destinations are appropriate for that community and compliant with applicable Reddit rules and policies.
-
-## Current navigation experience
-
-The menu currently includes:
+Current destinations include:
 
 - **AnimeH34**
 - **AlyaNSFW**
@@ -50,137 +25,26 @@ The menu currently includes:
 - **AnimeH34 Discord**
 - **Modmail**
 
-The navigation buttons are intentionally visual:
+The menu uses community-specific artwork and visual styling while keeping the labels consistent and easy to read. Image-based destinations preserve their artwork without stretching, while destinations without artwork use animated visual backgrounds.
 
-- Image-backed communities use their configured banner artwork without stretching the source image.
-- Gradient-only destinations use unique animated dark gradient treatments.
-- Navigation labels use one consistent font family, size, and weight across destinations, with the existing accent treatment providing visual distinction.
-- Image-backed destination buttons are taller than gradient-only destinations so their artwork has enough visual area.
-- The welcome animation is separate from the menu background; after the transition, the menu uses an animated ambient gradient instead of continuing the GIF.
+## Moderator functionality
 
-## Moderator menu action
+Subreddit moderators have a **Create HentaiApp Post** action in the subreddit menu.
 
-The subreddit three-dot menu contains:
+This lets moderators quickly create a new HentaiApp custom post for the community. The action is intended for setting up or refreshing the community's HentaiApp entry point.
 
-**Create HentaiApp Post**
+## User experience
 
-This action is restricted to subreddit moderators by the Devvit configuration.
+HentaiApp is designed to be:
 
-When selected, the server:
+- Easy to understand without instructions
+- Fast to navigate
+- Comfortable to use on mobile screens
+- Clearly separated into individual destination buttons
+- Visually branded while keeping navigation straightforward
 
-1. Reads the current subreddit context.
-2. Creates a HentaiApp custom post using the app's `default` entrypoint.
-3. Shows a success toast after the post is created.
-4. Shows an error toast if the post cannot be created.
+The button list can be scrolled vertically on smaller screens, allowing the complete set of destinations to remain accessible without requiring the entire page to be compressed into one view.
 
-The action does not attempt to navigate to the created post automatically. This avoids passing Reddit's relative permalink directly to the Devvit UI navigation bridge.
+## Intended audience
 
-## Asset and configuration model
-
-Destination assets are configured in:
-
-`src/shared/subreddit.ts`
-
-Each destination can define:
-
-```text
-Destination
-├── background
-├── backgroundGradient
-├── icon
-└── accent
-```
-
-Backgrounds and icons are independent, so changing one does not require changing the other.
-
-The welcome animation assets are stored under `public/`.
-
-## Development requirements
-
-Node.js **24 or newer** is required.
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Run TypeScript checks:
-
-```bash
-npm run type-check
-```
-
-Build the application:
-
-```bash
-npm run build
-```
-
-Run a Devvit playtest:
-
-```bash
-npm run dev
-```
-
-Upload a new app version:
-
-```bash
-npm run deploy
-```
-
-Publish the current version for Reddit review:
-
-```bash
-npm run launch
-```
-
-Log in to the Devvit CLI:
-
-```bash
-npm run login
-```
-
-## Testing checklist
-
-Before submitting an update for review:
-
-1. Run `npm run type-check`.
-2. Run `npm run build`.
-3. Run `npm run dev` and open the Playtest URL.
-4. Verify the welcome animation loads on desktop and mobile-sized layouts.
-5. Verify the transition from the welcome animation to the navigation menu.
-6. Verify image-backed destinations preserve their artwork proportions.
-7. Verify gradient-only destinations do not show placeholder image backgrounds.
-8. Verify each destination opens only after an explicit user click.
-9. Verify the moderator-only **Create HentaiApp Post** menu action.
-10. Verify the generated custom post opens the normal `default` entrypoint.
-11. Test the experience in both desktop and mobile Reddit clients when possible.
-
-## Project structure
-
-- `src/client/` - React custom-post UI, responsive layout, animation, and destination rendering
-- `src/server/` - Devvit Web server endpoints and the moderator menu endpoint
-- `src/shared/` - destination configuration, navigation destinations, and subreddit helpers
-- `public/portals/` - destination icons and image-backed destination artwork
-- `public/` - welcome animation assets
-- `devvit.json` - Devvit custom-post and subreddit menu configuration
-
-## Configuration
-
-The current Devvit configuration defines:
-
-- a single `default` custom-post entrypoint
-- a server entrypoint for menu/API handling
-- the moderator-only **Create HentaiApp Post** subreddit menu action
-- Reddit permission required for the app's Reddit API operations
-
-For the authoritative implementation, see `devvit.json`, `src/client/MenuApp.tsx`, `src/client/index.css`, `src/server/index.ts`, and `src/shared/subreddit.ts`.
-
-## App review readiness
-
-This README is intended to give reviewers and moderators a plain-language explanation of the app's purpose, operation, navigation behavior, and data practices.
-
-The app should be reviewed together with the current source and its configured destinations. Configuration changes that materially change the app's functionality or policy posture should be reflected here before a new review submission.
-
-Reddit's current Devvit rules require apps to provide a clear, non-vague README describing what the app does, who it is for, and how the full feature set works. See the official Devvit rules and review guidance for current requirements.
+HentaiApp is intended for Reddit communities and their moderators who want a dedicated, visually organized navigation page for community destinations and resources.
