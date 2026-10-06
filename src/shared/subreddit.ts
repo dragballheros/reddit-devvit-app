@@ -45,6 +45,7 @@ export const APP_CONFIG: AppConfig = {
       accent: '#f0be46',
     },
     modmail: {
+      icon: '/portals/ModmailIcon.svg',
       accent: '#72bfff',
     },
     x: {
@@ -74,6 +75,7 @@ export const APP_CONFIG: AppConfig = {
       },
     },
     createPost: {
+      icon: '/portals/RedditCreatePostIcon.svg',
       accent: '#b18cff',
     },
   },
