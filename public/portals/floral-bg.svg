@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#241936"/>
+      <stop offset="0.55" stop-color="#100b1d"/>
+      <stop offset="1" stop-color="#05040a"/>
+    </radialGradient>
+    <radialGradient id="petal" cx="35%" cy="25%" r="80%">
+      <stop offset="0" stop-color="#f7d9ff" stop-opacity=".9"/>
+      <stop offset=".45" stop-color="#b98cff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#6b4eaa" stop-opacity=".08"/>
+    </radialGradient>
+    <radialGradient id="petalPink" cx="35%" cy="25%" r="80%">
+      <stop offset="0" stop-color="#ffd9ef" stop-opacity=".82"/>
+      <stop offset=".45" stop-color="#ff82bd" stop-opacity=".46"/>
+      <stop offset="1" stop-color="#7c2854" stop-opacity=".08"/>
+    </radialGradient>
+    <filter id="blur">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <g id="flower">
+      <ellipse cx="0" cy="-54" rx="28" ry="62" fill="url(#petal)"/>
+      <ellipse cx="0" cy="-54" rx="28" ry="62" fill="url(#petal)" transform="rotate(60)"/>
+      <ellipse cx="0" cy="-54" rx="28" ry="62" fill="url(#petal)" transform="rotate(120)"/>
+      <ellipse cx="0" cy="-54" rx="28" ry="62" fill="url(#petal)" transform="rotate(180)"/>
+      <ellipse cx="0" cy="-54" rx="28" ry="62" fill="url(#petal)" transform="rotate(240)"/>
+      <ellipse cx="0" cy="-54" rx="28" ry="62" fill="url(#petal)" transform="rotate(300)"/>
+      <circle r="18" fill="#f8e9ff" fill-opacity=".75"/>
+      <circle r="7" fill="#ffb8df" fill-opacity=".9"/>
+    </g>
+    <g id="flowerPink">
+      <ellipse cx="0" cy="-44" rx="23" ry="52" fill="url(#petalPink)"/>
+      <ellipse cx="0" cy="-44" rx="23" ry="52" fill="url(#petalPink)" transform="rotate(72)"/>
+      <ellipse cx="0" cy="-44" rx="23" ry="52" fill="url(#petalPink)" transform="rotate(144)"/>
+      <ellipse cx="0" cy="-44" rx="23" ry="52" fill="url(#petalPink)" transform="rotate(216)"/>
+      <ellipse cx="0" cy="-44" rx="23" ry="52" fill="url(#petalPink)" transform="rotate(288)"/>
+      <circle r="15" fill="#ffeaf6" fill-opacity=".7"/>
+      <circle r="6" fill="#ffd06e" fill-opacity=".8"/>
+    </g>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <g opacity=".22" filter="url(#blur)">
+    <circle cx="180" cy="180" r="150" fill="#8b5cff"/>
+    <circle cx="1000" cy="690" r="190" fill="#ff4eae"/>
+    <circle cx="600" cy="470" r="160" fill="#4c6fff"/>
+  </g>
+  <g opacity=".42">
+    <path d="M40 780 C190 650 210 430 330 270 C410 160 480 130 560 90" fill="none" stroke="#a986d8" stroke-opacity=".28" stroke-width="4"/>
+    <path d="M1160 110 C1010 220 1000 420 870 570 C790 660 700 740 590 820" fill="none" stroke="#ff91c9" stroke-opacity=".22" stroke-width="4"/>
+    <path d="M90 110 C220 190 260 330 230 470 C210 560 170 650 120 720" fill="none" stroke="#8ed8bf" stroke-opacity=".18" stroke-width="3"/>
+  </g>
+  <g opacity=".72">
+    <use href="#flower" transform="translate(110 150) rotate(-18) scale(.9)"/>
+    <use href="#flowerPink" transform="translate(1050 165) rotate(18) scale(.8)"/>
+    <use href="#flower" transform="translate(1010 760) rotate(30) scale(1.05)"/>
+    <use href="#flowerPink" transform="translate(180 760) rotate(-22) scale(.78)"/>
+    <use href="#flower" transform="translate(640 120) rotate(12) scale(.55)"/>
+    <use href="#flowerPink" transform="translate(610 800) rotate(-8) scale(.62)"/>
+  </g>
+  <g fill="none" stroke="#e8c8ff" stroke-opacity=".18" stroke-width="2">
+    <circle cx="110" cy="150" r="78"/>
+    <circle cx="1050" cy="165" r="70"/>
+    <circle cx="1010" cy="760" r="92"/>
+    <circle cx="180" cy="760" r="68"/>
+  </g>
+  <rect x="22" y="22" width="1156" height="856" rx="42" fill="none" stroke="#e8d8ff" stroke-opacity=".12"/>
+</svg>

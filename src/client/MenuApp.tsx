@@ -20,6 +20,7 @@ type PortalButtonProps = {
   icon?: string;
   accent?: string;
   index: number;
+  disabled?: boolean;
 };
 
 const pickRandomItem = (items: string[], fallback: string) => {
@@ -78,6 +79,7 @@ const PortalButton = ({
   icon,
   accent = '#ffffff',
   index,
+  disabled = false,
 }: PortalButtonProps) => {
   return (
     <button
@@ -89,7 +91,9 @@ const PortalButton = ({
         } as React.CSSProperties
       }
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
+      aria-busy={disabled}
     >
       <span
         className={`portal-button__background${background ? '' : ' portal-button__background--empty'}`}
@@ -97,7 +101,6 @@ const PortalButton = ({
         aria-hidden="true"
       />
       <span className="portal-button__vignette" aria-hidden="true" />
-      <span className="portal-button__scan" aria-hidden="true" />
       <span className="portal-button__icon-shell" aria-hidden="true">
         {icon ? (
           <img className="portal-button__icon" src={icon} alt="" loading="lazy" decoding="async" />
@@ -116,6 +119,9 @@ const PortalButton = ({
 
 export const MenuApp = () => {
   const [isIntroHidden, setIsIntroHidden] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [isModeratorStatusLoaded, setIsModeratorStatusLoaded] = useState(false);
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
   const isMobile = useIsMobile();
   const isAndroid = context.client?.name === 'ANDROID';
 
@@ -140,6 +146,54 @@ export const MenuApp = () => {
     return () => clearTimeout(timer);
   }, [isMobile]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadModeratorStatus = async () => {
+      try {
+        const response = await fetch('/api/moderator-status');
+        if (!response.ok) return;
+
+        const data = (await response.json()) as { isModerator?: boolean };
+        if (!cancelled) setIsModerator(data.isModerator === true);
+      } catch (error) {
+        console.error('Failed to load moderator status', error);
+      } finally {
+        if (!cancelled) setIsModeratorStatusLoaded(true);
+      }
+    };
+
+    void loadModeratorStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const createModeratorPost = async () => {
+    if (!isModerator || isCreatingPost) return;
+
+    setIsCreatingPost(true);
+    try {
+      const response = await fetch('/api/moderator/create-post', {
+        method: 'POST',
+      });
+
+      const data = (await response.json()) as { permalink?: string; error?: string };
+
+      if (!response.ok || !data.permalink) {
+        console.error(data.error ?? 'Failed to create the custom post');
+        return;
+      }
+
+      navigateTo(data.permalink);
+    } catch (error) {
+      console.error('Failed to create moderator post', error);
+    } finally {
+      setIsCreatingPost(false);
+    }
+  };
+
   const portals = useMemo(() => {
     const subredditPortals = APP_CONFIG.links.otherSubreddits
       .filter((name) => normalizeSubredditName(name) !== currentSubredditName)
@@ -154,6 +208,22 @@ export const MenuApp = () => {
           onClick: () => navigateTo(`https://www.reddit.com/r/${name}/`),
         };
       });
+
+    const moderatorPostPortal =
+      isModeratorStatusLoaded && isModerator
+        ? [
+            {
+              label: isCreatingPost ? 'Creating Portal Post...' : 'Create Portal Post',
+              background: APP_CONFIG.portals.createPost.background,
+              icon: APP_CONFIG.portals.createPost.icon,
+              accent: APP_CONFIG.portals.createPost.accent,
+              disabled: isCreatingPost,
+              onClick: () => {
+                void createModeratorPost();
+              },
+            },
+          ]
+        : [];
 
     return [
       {
@@ -178,16 +248,15 @@ export const MenuApp = () => {
         onClick: () => navigateTo(APP_CONFIG.links.twitter),
       },
       ...subredditPortals,
-      {
-        label: 'Create Post',
-        background: APP_CONFIG.portals.createPost.background,
-        icon: APP_CONFIG.portals.createPost.icon,
-        accent: APP_CONFIG.portals.createPost.accent,
-        onClick: () =>
-          navigateTo(`https://www.reddit.com/r/${currentSubredditName || 'hentai'}/submit`),
-      },
+      ...moderatorPostPortal,
     ];
-  }, [currentSubredditName, modmailLink]);
+  }, [
+    currentSubredditName,
+    isCreatingPost,
+    isModerator,
+    isModeratorStatusLoaded,
+    modmailLink,
+  ]);
 
   return (
     <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>

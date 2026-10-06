@@ -21,9 +21,7 @@ body {
   color: rgba(248, 246, 255, 0.96);
 }
 
-button {
-  font: inherit;
-}
+button { font: inherit; }
 
 .app {
   position: relative;
@@ -47,8 +45,8 @@ button {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 15%, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.86) 72%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.88));
+    radial-gradient(circle at 50% 15%, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.82) 72%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.88));
 }
 
 .menu__content {
@@ -61,6 +59,22 @@ button {
   flex-direction: column;
   gap: 16px;
   overflow: hidden;
+}
+
+.menu__content::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: -1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 30px;
+  background:
+    linear-gradient(rgba(9, 6, 18, 0.78), rgba(9, 6, 18, 0.88)),
+    url("/portals/floral-bg.svg") center / cover;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.46),
+    inset 0 0 70px rgba(177, 140, 255, 0.08);
+  opacity: 0.96;
 }
 
 .menu__header {
@@ -94,9 +108,11 @@ button {
   gap: 10px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 2px 4px 10px;
+  padding: 10px 8px 14px;
   scrollbar-width: none;
   overscroll-behavior: contain;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 24px;
 }
 
 .portal-grid::-webkit-scrollbar { display: none; }
@@ -113,7 +129,7 @@ button {
   display: flex;
   align-items: center;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--portal-accent) 55%, white 18%);
+  border: 0;
   border-radius: var(--portal-radius);
   background: #000;
   color: white;
@@ -121,51 +137,58 @@ button {
   text-align: left;
   box-shadow:
     0 12px 28px rgba(0,0,0,0.42),
-    0 0 22px color-mix(in srgb, var(--portal-accent) 16%, transparent),
+    0 0 20px color-mix(in srgb, var(--portal-accent) 13%, transparent),
     inset 0 0 24px rgba(255,255,255,0.05);
   transform: translateZ(0);
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
-  animation: portal-idle 3.8s ease-in-out infinite;
-  animation-delay: calc(var(--portal-index) * -0.23s);
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
 .portal-button::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: 0;
   z-index: 5;
   pointer-events: none;
   border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    transparent 24deg,
-    color-mix(in srgb, var(--portal-accent) 88%, white) 62deg,
-    transparent 104deg,
-    transparent 190deg,
-    color-mix(in srgb, var(--portal-accent) 62%, white) 232deg,
-    transparent 282deg,
-    transparent 360deg
-  );
+  padding: 2px;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg 18deg,
+      color-mix(in srgb, var(--portal-accent) 12%, transparent) 24deg,
+      color-mix(in srgb, var(--portal-accent) 96%, white) 38deg,
+      white 48deg,
+      color-mix(in srgb, var(--portal-accent) 70%, transparent) 62deg,
+      transparent 78deg 154deg,
+      color-mix(in srgb, var(--portal-accent) 70%, transparent) 166deg,
+      color-mix(in srgb, var(--portal-accent) 96%, white) 184deg,
+      transparent 202deg 290deg,
+      color-mix(in srgb, var(--portal-accent) 90%, white) 308deg,
+      transparent 326deg 360deg
+    );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: portal-ring 2.9s linear infinite;
+  filter:
+    drop-shadow(0 0 4px color-mix(in srgb, var(--portal-accent) 78%, transparent))
+    drop-shadow(0 0 12px color-mix(in srgb, var(--portal-accent) 30%, transparent));
+  animation: portal-ring 5.2s linear infinite;
+  animation-delay: calc(var(--portal-index) * -0.35s);
 }
 
 .portal-button::after {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 2px;
   z-index: 4;
   pointer-events: none;
+  border-radius: calc(var(--portal-radius) - 2px);
   background:
-    linear-gradient(105deg, transparent 0 38%, rgba(255,255,255,0.15) 45%, transparent 52%),
-    repeating-linear-gradient(180deg, transparent 0 7px, rgba(255,255,255,0.025) 8px 9px);
-  background-size: 220% 100%, 100% 100%;
-  mix-blend-mode: screen;
-  animation: portal-scan 4.6s linear infinite;
+    radial-gradient(circle at 0% 50%, color-mix(in srgb, var(--portal-accent) 20%, transparent), transparent 24%),
+    radial-gradient(circle at 100% 50%, color-mix(in srgb, var(--portal-accent) 12%, transparent), transparent 22%);
+  opacity: 0.7;
+  animation: portal-breathe 3.8s ease-in-out infinite;
+  animation-delay: calc(var(--portal-index) * -0.23s);
 }
 
 .portal-button__background {
@@ -180,27 +203,15 @@ button {
   animation: portal-background 8s ease-in-out infinite alternate;
 }
 
-.portal-button__background--empty {
-  background: #000;
-}
+.portal-button__background--empty { background: #000; }
 
 .portal-button__vignette {
   position: absolute;
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(90deg, rgba(0,0,0,0.86) 0%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.16) 52%, rgba(0,0,0,0.58) 100%),
+    linear-gradient(90deg, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.46) 20%, rgba(0,0,0,0.12) 52%, rgba(0,0,0,0.58) 100%),
     radial-gradient(circle at 16% 50%, color-mix(in srgb, var(--portal-accent) 22%, transparent), transparent 30%);
-}
-
-.portal-button__scan {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: radial-gradient(circle at 10% 50%, color-mix(in srgb, var(--portal-accent) 30%, transparent), transparent 22%);
-  opacity: 0.85;
-  animation: portal-aura 2.8s ease-in-out infinite;
 }
 
 .portal-button__icon-shell {
@@ -245,7 +256,6 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0;
   padding-right: 12px;
 }
 
@@ -292,11 +302,15 @@ button {
 .portal-button:focus-visible {
   outline: none;
   transform: translateY(-2px) scale(1.008);
-  border-color: color-mix(in srgb, var(--portal-accent) 82%, white 30%);
   box-shadow:
     0 18px 38px rgba(0,0,0,0.52),
-    0 0 28px color-mix(in srgb, var(--portal-accent) 32%, transparent),
+    0 0 34px color-mix(in srgb, var(--portal-accent) 34%, transparent),
     inset 0 0 28px rgba(255,255,255,0.07);
+}
+
+.portal-button:disabled {
+  cursor: wait;
+  opacity: 0.8;
 }
 
 .portal-button:active {
@@ -330,9 +344,7 @@ button {
   object-position: center;
 }
 
-.intro__media--wide {
-  width: max-content;
-}
+.intro__media--wide { width: max-content; }
 
 .intro__title {
   position: absolute;
@@ -358,28 +370,18 @@ button {
   animation: title-sweep 1.8s ease-in-out infinite;
 }
 
-@keyframes portal-idle {
-  0%, 100% { box-shadow: 0 12px 28px rgba(0,0,0,0.42), 0 0 20px color-mix(in srgb, var(--portal-accent) 13%, transparent), inset 0 0 24px rgba(255,255,255,0.05); }
-  50% { box-shadow: 0 14px 30px rgba(0,0,0,0.46), 0 0 30px color-mix(in srgb, var(--portal-accent) 22%, transparent), inset 0 0 28px rgba(255,255,255,0.06); }
-}
-
 @keyframes portal-ring {
   to { transform: rotate(360deg); }
 }
 
-@keyframes portal-scan {
-  0% { background-position: -220% 0, 0 0; }
-  100% { background-position: 220% 0, 0 0; }
+@keyframes portal-breathe {
+  0%, 100% { opacity: 0.42; transform: scale(0.985); }
+  50% { opacity: 0.9; transform: scale(1.01); }
 }
 
 @keyframes portal-background {
   from { transform: scale(1.035) translate3d(-0.3%, 0, 0); }
   to { transform: scale(1.075) translate3d(0.3%, -0.6%, 0); }
-}
-
-@keyframes portal-aura {
-  0%, 100% { opacity: 0.55; transform: scale(0.98); }
-  50% { opacity: 0.95; transform: scale(1.02); }
 }
 
 @keyframes portal-icon {
@@ -400,9 +402,7 @@ button {
 @media (max-width: 600px) {
   :root { --portal-height: clamp(68px, 10.5vh, 88px); }
 
-  .menu {
-    align-items: stretch;
-  }
+  .menu { align-items: stretch; }
 
   .menu__content {
     width: 100%;
@@ -413,18 +413,25 @@ button {
       calc(12px + env(safe-area-inset-bottom));
   }
 
-  .menu__title {
-    font-size: clamp(1.35rem, 6vw, 2rem);
+  .menu__content::before {
+    inset: 5px;
+    border-radius: 24px;
   }
+
+  .menu__title { font-size: clamp(1.35rem, 6vw, 2rem); }
 
   .portal-grid {
     gap: 8px;
-    padding: 2px 0 8px;
+    padding: 8px 4px 10px;
   }
 
   .portal-button {
     border-radius: 18px;
     padding-right: 10px;
+  }
+
+  .portal-button::after {
+    border-radius: 16px;
   }
 
   .portal-button__icon-shell {
@@ -446,7 +453,10 @@ button {
   }
 }
 
-/* Android renderer: same visuals, fewer expensive continuously-repainted effects. */
+.app--android .portal-button::before {
+  animation-duration: 7s;
+}
+
 .app--android .portal-button__background,
 .app--android .portal-button__icon-shell,
 .app--android .portal-button__energy {

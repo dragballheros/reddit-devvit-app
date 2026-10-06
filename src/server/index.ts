@@ -4,14 +4,65 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
 
+const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
+  if (!context.userId) return false;
+
+  const user = await reddit.getUserById(context.userId);
+  if (!user) return false;
+
+  const permissions = await user.getModPermissionsForSubreddit(subredditName);
+  return permissions.length > 0;
+};
+
+app.get('/api/moderator-status', async (c) => {
+  try {
+    const subredditName = context.subredditName;
+    if (!subredditName) {
+      return c.json({ isModerator: false });
+    }
+
+    return c.json({
+      isModerator: await isCurrentUserModerator(subredditName),
+    });
+  } catch (error) {
+    console.error('Failed to determine moderator status', error);
+    return c.json({ isModerator: false });
+  }
+});
+
+app.post('/api/moderator/create-post', async (c) => {
+  try {
+    const subredditName = context.subredditName;
+    if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
+      return c.json({ error: 'Moderator access required.' }, 403);
+    }
+
+    const post = await reddit.submitCustomPost({
+      subredditName,
+      title: 'AnimeH34 Portal Demo',
+      entry: 'default',
+    });
+
+    return c.json({
+      permalink: post.permalink,
+    });
+  } catch (error) {
+    console.error('Failed to create moderator portal post', error);
+    return c.json(
+      { error: 'Failed to create the custom post. Check the app account permissions.' },
+      500
+    );
+  }
+});
+
 app.post('/internal/menu/create-post', async (c) => {
   try {
     await c.req.json<MenuItemRequest>().catch(() => ({}));
 
     const subredditName = context.subredditName;
-    if (!subredditName) {
+    if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
       return c.json<UiResponse>({
-        showToast: 'No subreddit context was available.',
+        showToast: 'Moderator access is required to create the example post.',
       });
     }
 
@@ -34,5 +85,5 @@ app.post('/internal/menu/create-post', async (c) => {
 });
 
 const server = createServer(app);
-server.on('error', (error) => console.error(`server error; ${error}`));
+server.on('error', (error: Error) => console.error(`server error; ${error.message}`));
 server.listen(getServerPort());
