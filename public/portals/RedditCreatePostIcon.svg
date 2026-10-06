@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="reddit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#efe3ff"/>
+      <stop offset="0.5" stop-color="#b68cff"/>
+      <stop offset="1" stop-color="#7447ff"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g filter="url(#glow)" fill="url(#reddit)" stroke="#f3eaff" stroke-width="2">
+    <path d="M64 36c-25 0-45 15-45 34s20 34 45 34 45-15 45-34S89 36 64 36z"/>
+    <circle cx="47" cy="67" r="6" fill="#21114f" stroke="none"/>
+    <circle cx="81" cy="67" r="6" fill="#21114f" stroke="none"/>
+    <path d="M49 82c8 7 22 7 30 0" fill="none" stroke="#21114f" stroke-width="4" stroke-linecap="round"/>
+    <path d="M64 36l7-20" fill="none" stroke="#d9c4ff" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="75" cy="13" r="7" fill="#d9c4ff" stroke="none"/>
+  </g>
+</svg>
