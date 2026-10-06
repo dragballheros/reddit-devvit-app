@@ -54,7 +54,7 @@ The navigation buttons are intentionally visual:
 
 - Image-backed communities use their configured banner artwork without stretching the source image.
 - Gradient-only destinations use unique animated dark gradient treatments.
-- Navigation labels use community-specific font, size, weight, and color treatments.
+- Navigation labels use one consistent font family, size, and weight across destinations, with the existing accent treatment providing visual distinction.
 - Image-backed destination buttons are taller than gradient-only destinations so their artwork has enough visual area.
 - The welcome animation is separate from the menu background; after the transition, the menu uses an animated ambient gradient instead of continuing the GIF.
 
@@ -89,9 +89,6 @@ Destination
 ├── backgroundGradient
 ├── icon
 ├── accent
-├── labelFont
-├── labelSize
-├── labelColor
 └── labelWeight
 ```
 
