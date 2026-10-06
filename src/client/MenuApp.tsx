@@ -85,7 +85,7 @@ const PortalButton = ({
 }: PortalButtonProps) => {
   return (
     <button
-      className="portal-button"
+      className={`portal-button${background ? ' portal-button--image' : ''}`}
       style={
         {
           '--portal-accent': accent,
