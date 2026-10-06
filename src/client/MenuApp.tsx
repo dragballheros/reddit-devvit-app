@@ -118,6 +118,7 @@ const PortalButton = ({
 export const MenuApp = () => {
   const [isIntroHidden, setIsIntroHidden] = useState(false);
   const isMobile = useIsMobile();
+  const isAndroid = context.client?.name === 'ANDROID';
 
   const sessionGifSrc = useMemo(() => {
     const variants = isMobile
@@ -190,7 +191,7 @@ export const MenuApp = () => {
   }, [currentSubredditName, modmailLink]);
 
   return (
-    <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'}`}>
+    <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
       <section
         className="menu"
         style={{
