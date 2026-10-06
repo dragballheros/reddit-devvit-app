@@ -14,17 +14,6 @@ When a HentaiApp custom post is opened, users see a short welcome animation foll
 
 The menu provides large, clearly labeled buttons that users can select to open the configured destination. The experience is designed to work on both desktop and mobile Reddit clients.
 
-Current destinations include:
-
-- **AnimeH34**
-- **AlyaNSFW**
-- **HentaiGIFS**
-- **DragonBallNSFW**
-- **AnimeAI**
-- **X/Twitter (ElfariaNSFW)**
-- **AnimeH34 Discord**
-- **Modmail**
-
 The menu uses community-specific artwork and visual styling while keeping the labels consistent and easy to read. Image-based destinations preserve their artwork without stretching, while destinations without artwork use animated visual backgrounds.
 
 ## Moderator functionality
