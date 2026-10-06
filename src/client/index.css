@@ -305,9 +305,10 @@ button { font: inherit; }
   display: block;
   min-width: 0;
   overflow: hidden;
-  color: rgba(255,255,255,0.97);
-  font-size: clamp(0.9rem, 2.1vw, 1.35rem);
-  font-weight: 800;
+  color: var(--portal-label-color, rgba(255,255,255,0.97));
+  font-family: var(--portal-label-font, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--portal-label-size, clamp(0.9rem, 2.1vw, 1.35rem));
+  font-weight: var(--portal-label-weight, 800);
   letter-spacing: 0.06em;
   line-height: 1.1;
   text-overflow: ellipsis;
