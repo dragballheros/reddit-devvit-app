@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="mail" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dff7ff"/>
+      <stop offset="0.45" stop-color="#8ed8ff"/>
+      <stop offset="1" stop-color="#168cff"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <path filter="url(#glow)" d="M14 28h100v72H14z" fill="none" stroke="#2da8ff" stroke-width="5" rx="8"/>
+  <path d="M17 31l47 39 47-39" fill="none" stroke="url(#mail)" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M18 97l35-31M110 97L75 66" fill="none" stroke="#6bc8ff" stroke-width="6" stroke-linecap="round"/>
+</svg>
