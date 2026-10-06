@@ -20,6 +20,10 @@ type PortalButtonProps = {
   backgroundGradient?: string;
   icon?: string;
   accent?: string;
+  labelFont?: string;
+  labelSize?: string;
+  labelColor?: string;
+  labelWeight?: number;
   index: number;
   disabled?: boolean;
 };
@@ -80,6 +84,10 @@ const PortalButton = ({
   backgroundGradient,
   icon,
   accent = '#ffffff',
+  labelFont,
+  labelSize,
+  labelColor,
+  labelWeight,
   index,
   disabled = false,
 }: PortalButtonProps) => {
@@ -91,6 +99,10 @@ const PortalButton = ({
           '--portal-accent': accent,
           '--portal-index': index,
           '--portal-gradient': backgroundGradient ?? 'linear-gradient(120deg, #111827, #000000)',
+          '--portal-label-font': labelFont ?? 'Inter, ui-sans-serif, system-ui, sans-serif',
+          '--portal-label-size': labelSize ?? 'clamp(0.9rem, 2.1vw, 1.35rem)',
+          '--portal-label-color': labelColor ?? 'rgba(255,255,255,0.97)',
+          '--portal-label-weight': labelWeight ?? 800,
         } as React.CSSProperties
       }
       onClick={onClick}
@@ -158,6 +170,10 @@ export const MenuApp = () => {
           backgroundGradient: asset?.backgroundGradient,
           icon: asset?.icon,
           accent: asset?.accent,
+          labelFont: asset?.labelFont,
+          labelSize: asset?.labelSize,
+          labelColor: asset?.labelColor,
+          labelWeight: asset?.labelWeight,
           onClick: () => navigateTo(`https://www.reddit.com/r/${name}/`),
         };
       });
@@ -168,15 +184,23 @@ export const MenuApp = () => {
         background: APP_CONFIG.portals.animeh34.background,
         icon: APP_CONFIG.portals.animeh34.icon,
         accent: APP_CONFIG.portals.animeh34.accent,
+        labelFont: APP_CONFIG.portals.animeh34.labelFont,
+        labelSize: APP_CONFIG.portals.animeh34.labelSize,
+        labelColor: APP_CONFIG.portals.animeh34.labelColor,
+        labelWeight: APP_CONFIG.portals.animeh34.labelWeight,
         onClick: () => navigateTo('https://www.reddit.com/r/AnimeH34/'),
       },
       ...subredditPortals,
       {
-        label: 'x.com/ElfariaNSFW',
+        label: 'X/Twitter (ElfariaNSFW)',
         background: APP_CONFIG.portals.x.background,
         backgroundGradient: APP_CONFIG.portals.x.backgroundGradient,
         icon: APP_CONFIG.portals.x.icon,
         accent: APP_CONFIG.portals.x.accent,
+        labelFont: APP_CONFIG.portals.x.labelFont,
+        labelSize: APP_CONFIG.portals.x.labelSize,
+        labelColor: APP_CONFIG.portals.x.labelColor,
+        labelWeight: APP_CONFIG.portals.x.labelWeight,
         onClick: () => navigateTo(APP_CONFIG.links.twitter),
       },
       {
@@ -185,6 +209,10 @@ export const MenuApp = () => {
         backgroundGradient: APP_CONFIG.portals.discord.backgroundGradient,
         icon: APP_CONFIG.portals.discord.icon,
         accent: APP_CONFIG.portals.discord.accent,
+        labelFont: APP_CONFIG.portals.discord.labelFont,
+        labelSize: APP_CONFIG.portals.discord.labelSize,
+        labelColor: APP_CONFIG.portals.discord.labelColor,
+        labelWeight: APP_CONFIG.portals.discord.labelWeight,
         onClick: () => navigateTo(APP_CONFIG.links.discord),
       },
       {
@@ -193,6 +221,10 @@ export const MenuApp = () => {
         backgroundGradient: APP_CONFIG.portals.modmail.backgroundGradient,
         icon: APP_CONFIG.portals.modmail.icon,
         accent: APP_CONFIG.portals.modmail.accent,
+        labelFont: APP_CONFIG.portals.modmail.labelFont,
+        labelSize: APP_CONFIG.portals.modmail.labelSize,
+        labelColor: APP_CONFIG.portals.modmail.labelColor,
+        labelWeight: APP_CONFIG.portals.modmail.labelWeight,
         onClick: () => navigateTo(modmailLink),
       },
     ];
