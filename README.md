@@ -55,7 +55,7 @@ The navigation buttons are intentionally visual:
 - Image-backed communities use their configured banner artwork without stretching the source image.
 - Gradient-only destinations use unique animated dark gradient treatments.
 - Navigation labels use community-specific font, size, weight, and color treatments.
-- Image-backed destination buttons are taller than gradient-only portals so their artwork has enough visual area.
+- Image-backed destination buttons are taller than gradient-only destinations so their artwork has enough visual area.
 - The welcome animation is separate from the menu background; after the transition, the menu uses an animated ambient gradient instead of continuing the GIF.
 
 ## Moderator menu action
@@ -154,8 +154,8 @@ Before submitting an update for review:
 3. Run `npm run dev` and open the Playtest URL.
 4. Verify the welcome animation loads on desktop and mobile-sized layouts.
 5. Verify the transition from the welcome animation to the navigation menu.
-6. Verify image-backed portals preserve their artwork proportions.
-7. Verify gradient-only portals do not show placeholder image backgrounds.
+6. Verify image-backed destinations preserve their artwork proportions.
+7. Verify gradient-only destinations do not show placeholder image backgrounds.
 8. Verify each destination opens only after an explicit user click.
 9. Verify the moderator-only **Create HentaiApp Post** menu action.
 10. Verify the generated custom post opens the normal `default` entrypoint.
