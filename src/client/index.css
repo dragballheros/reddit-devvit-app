@@ -226,17 +226,25 @@ button { font: inherit; }
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  background-size: 220% 220%, cover;
-  background-position: 0% 50%, center;
-  transform: scale(1.035);
+  transform: scale(1.02);
+  transform-origin: center;
   filter: saturate(1.05) contrast(1.04);
-  animation: portal-background 8s ease-in-out infinite alternate;
+}
+
+.portal-button--image {
+  flex-basis: clamp(112px, 15vh, 148px);
+  min-height: clamp(112px, 15vh, 148px);
+}
+
+.portal-button--image .portal-button__background {
+  animation: portal-image-breathe 9s ease-in-out infinite alternate;
 }
 
 .portal-button__background--empty {
   background: var(--portal-gradient);
   background-size: 220% 220%;
   background-position: 0% 50%;
+  animation: portal-gradient-flow 8s ease-in-out infinite alternate;
 }
 
 .portal-button__vignette {
@@ -447,9 +455,14 @@ button { font: inherit; }
   to { filter: hue-rotate(10deg) saturate(1.18); transform: scale(1.015); }
 }
 
-@keyframes portal-background {
-  from { transform: scale(1.035) translate3d(-0.3%, 0, 0); background-position: 0% 50%, center; }
-  to { transform: scale(1.075) translate3d(0.3%, -0.6%, 0); background-position: 100% 50%, center; }
+@keyframes portal-image-breathe {
+  from { transform: scale(1.02) translate3d(-0.15%, 0, 0); }
+  to { transform: scale(1.055) translate3d(0.15%, -0.35%, 0); }
+}
+
+@keyframes portal-gradient-flow {
+  from { background-position: 0% 50%; transform: scale(1.02); }
+  to { background-position: 100% 50%; transform: scale(1.055); }
 }
 
 @keyframes portal-icon {
@@ -496,6 +509,11 @@ button { font: inherit; }
   .portal-button {
     border-radius: 18px;
     padding-right: 10px;
+  }
+
+  .portal-button--image {
+    flex-basis: clamp(94px, 13vh, 118px);
+    min-height: clamp(94px, 13vh, 118px);
   }
 
   .portal-button::after {
