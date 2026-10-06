@@ -88,8 +88,7 @@ Destination
 ├── background
 ├── backgroundGradient
 ├── icon
-├── accent
-└── labelWeight
+└── accent
 ```
 
 Backgrounds and icons are independent, so changing one does not require changing the other.
