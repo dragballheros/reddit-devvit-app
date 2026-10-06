@@ -94,9 +94,16 @@ app.post('/internal/menu/create-post', async (c) => {
 
     console.log('Created HentaiApp custom post ' + post.id + ' in r/' + subredditName);
 
+    /*
+     * submitCustomPost() returns Reddit's relative permalink. The Devvit
+     * menu bridge passes navigateTo() to UIClient, which requires an
+     * absolute URL, so do not pass the relative permalink directly.
+     *
+     * Creation itself succeeded. Keep the menu action successful and let
+     * the user open the created post from the subreddit feed.
+     */
     return c.json<UiResponse>({
       showToast: 'Example post created.',
-      navigateTo: post.permalink,
     });
   } catch (error) {
     console.error('Failed to create example post from subreddit menu:', error);
