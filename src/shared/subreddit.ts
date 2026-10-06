@@ -33,7 +33,7 @@ export const APP_CONFIG: AppConfig = {
   introGifDesktopVariants: ['/intro-hentai-desktop.gif', '/intro-desktop.gif'],
   menuGifDesktop: '/hentai-desktop.gif',
   introGifMobile: '/hentai-mobile.gif',
-  introGifMobileVariants: ['/intro-hentai-mobile.gif'],
+  introGifMobileVariants: ['/hentai-mobile.gif'],
   menuGifMobile: '/hentai-mobilebg.gif',
   introGifFit: 'cover',
   links: {
