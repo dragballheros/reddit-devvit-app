@@ -1,5 +1,6 @@
 export type PortalAsset = {
   background?: string;
+  backgroundGradient?: string;
   icon?: string;
   accent?: string;
 };
@@ -48,16 +49,19 @@ export const APP_CONFIG: AppConfig = {
       accent: '#ff5ca8',
     },
     discord: {
+      backgroundGradient: 'linear-gradient(120deg, #f6c453 0%, #b83a3a 48%, #3b1d2a 100%)',
       background:
         'https://www.scenichudson.org/wp-content/uploads/2024/12/DSC_9302-Enhanced-NR-1400x933.jpg',
       icon: '/portals/AnimeH34Icon.png',
       accent: '#f0be46',
     },
     modmail: {
+      backgroundGradient: 'linear-gradient(120deg, #00e5ff 0%, #147dff 48%, #18285c 100%)',
       icon: '/portals/ModmailIcon.svg',
       accent: '#72bfff',
     },
     x: {
+      backgroundGradient: 'linear-gradient(120deg, #f4f7ff 0%, #7d8cff 42%, #20234d 100%)',
       background: '/portals/ElfariaNSFWBanner.jpg',
       icon: '/portals/ElfariaNSFWIcon.png',
       accent: '#f2f2f4',
@@ -79,6 +83,7 @@ export const APP_CONFIG: AppConfig = {
         accent: '#ff9b37',
       },
       animeai: {
+        backgroundGradient: 'linear-gradient(120deg, #ff4fd8 0%, #7b4dff 45%, #24134f 100%)',
         icon: '/portals/AnimeAIIcon.jpg',
         accent: '#aa82ff',
       },
