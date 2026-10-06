@@ -1,55 +1,107 @@
-# Devvit Navigation Experience
+# HentaiApp
 
-A futuristic portal-style navigation experience for a subreddit. The app keeps the original welcome/menu flow while presenting community destinations as animated widescreen portals.
+HentaiApp is a subreddit navigation experience built with Reddit's Developer Platform (Devvit). It gives a community one branded custom post that presents a welcome animation and then a clear, mobile-friendly portal menu for community destinations.
 
-## What the app does
+The app is intentionally focused on navigation and community routing. It does not host, mirror, scrape, download, or redistribute the content of the linked communities. The destinations are configured by the app developer and are presented as explicit user-initiated links.
 
-The custom post opens with the recovered welcome animation, then transitions into a portal menu.
+## Purpose and reviewer notes
 
-Current portal order:
+This app is a navigation utility for an existing subreddit community.
 
-1. **AnimeH34 Discord**
-2. **Modmail**
-3. **x.com/ElfariaNSFW**
-4. **AlyaNSFW**
-5. **HentaiGIFS**
-6. **DragonBallNSFW**
-7. **AnimeAI**
-8. **Create Post**
+The core experience is:
 
-Each portal is one clickable surface. Backgrounds and icons are separate assets so either can be replaced independently. A missing background or icon intentionally falls back to solid black instead of inventing or downloading a replacement asset.
+1. A short welcome animation is shown when the custom post opens.
+2. The animation transitions into the portal menu.
+3. Users choose a destination explicitly by pressing a portal.
+4. Subreddit destinations open the selected subreddit.
+5. Community resource links such as the configured Discord and X/Twitter destination open only when the user explicitly selects them.
+6. The subreddit moderator menu provides a moderator-only action for creating a new HentaiApp custom post for testing and review.
 
-The portal renderer includes a moving energy ring, animated scan/shimmer effects, icon glow/pulse, background motion, and hover/focus response. Android receives a lighter animation profile while keeping the same layout and visual structure.
+The app does **not**:
 
-## Create Example Post
+- automatically post, comment, vote, subscribe, follow, or message users
+- scrape or redistribute content from destination communities
+- provide a mirror of another website or app
+- collect or store personal user information
+- use HTTP Fetch or third-party APIs
+- require users to create an account outside Reddit
+- make automated background changes to subreddit content
 
-The subreddit three-dot menu includes **Create Example Post** for moderators.
+The app also does not claim to be operated by, sponsored by, or affiliated with Reddit, Discord, X/Twitter, or any destination community.
 
-Use it to create a real custom post running the app's default entry point. This is also the intended way to create the example post that reviewers can open while testing the app.
+## Mature-community scope
 
-The menu action:
+The portal destinations may include communities intended for mature audiences. Those destinations remain separate communities with their own moderation, labeling, and access controls.
 
-- uses the current subreddit context
-- creates an interactive custom post titled `AnimeH34 Portal Demo`
-- opens the newly created post after creation
-- reports a failure through a Reddit toast if the app account cannot submit the post
+HentaiApp's function is to provide navigation to configured community destinations. It is not a general-purpose content feed and does not remove or bypass Reddit's labeling, safety, blocking, or age-related controls.
 
-## Testing
+Community moderators should only install and configure the app in communities where the configured destinations are appropriate for that community and compliant with applicable Reddit rules and policies.
 
-1. Install the app in a development subreddit.
-2. Open the subreddit three-dot menu.
-3. Select **Create Example Post**.
-4. Open the generated **AnimeH34 Portal Demo** post.
-5. Confirm the welcome animation transitions into the portal menu.
-6. Confirm all portals are the same widescreen size.
-7. Confirm portals with supplied assets display their independent background and circular icon.
-8. Confirm portals without an asset currently render black rather than a placeholder image.
-9. Test each navigation destination.
-10. Test the generated example post on both desktop and mobile Reddit clients.
+## Current portal experience
 
-## Development
+The menu currently includes:
 
-> Node 24 or newer is required.
+- **AnimeH34**
+- **AlyaNSFW**
+- **HentaiGIFS**
+- **DragonBallNSFW**
+- **AnimeAI**
+- **X/Twitter (ElfariaNSFW)**
+- **AnimeH34 Discord**
+- **Modmail**
+
+The portal presentation is intentionally visual:
+
+- Image-backed communities use their configured banner artwork without stretching the source image.
+- Gradient-only destinations use unique animated dark gradient treatments.
+- Portal labels use community-specific font, size, weight, and color treatments.
+- Image-backed portals are taller than gradient-only portals so their artwork has enough visual area.
+- The welcome animation is separate from the menu background; after the transition, the menu uses an animated ambient gradient instead of continuing the GIF.
+
+## Moderator menu action
+
+The subreddit three-dot menu contains:
+
+**Create HentaiApp Post**
+
+This action is restricted to subreddit moderators by the Devvit configuration.
+
+When selected, the server:
+
+1. Reads the current subreddit context.
+2. Creates a HentaiApp custom post using the app's `default` entrypoint.
+3. Shows a success toast after the post is created.
+4. Shows an error toast if the post cannot be created.
+
+The action does not attempt to navigate to the created post automatically. This avoids passing Reddit's relative permalink directly to the Devvit UI navigation bridge.
+
+## Asset and configuration model
+
+Portal assets are configured in:
+
+`src/shared/subreddit.ts`
+
+Each portal can define:
+
+```text
+Portal
+├── background
+├── backgroundGradient
+├── icon
+├── accent
+├── labelFont
+├── labelSize
+├── labelColor
+└── labelWeight
+```
+
+Backgrounds and icons are independent, so changing one does not require changing the other.
+
+The welcome animation assets are stored under `public/`.
+
+## Development requirements
+
+Node.js **24 or newer** is required.
 
 Install dependencies:
 
@@ -57,63 +109,82 @@ Install dependencies:
 npm install
 ```
 
-Type-check:
+Run TypeScript checks:
 
 ```bash
 npm run type-check
 ```
 
-Build:
+Build the application:
 
 ```bash
 npm run build
 ```
 
-Playtest:
+Run a Devvit playtest:
 
 ```bash
 npm run dev
 ```
 
-Upload:
+Upload a new app version:
 
 ```bash
 npm run deploy
 ```
 
-Publish for review:
+Publish the current version for Reddit review:
 
 ```bash
 npm run launch
 ```
 
-## Project structure
+Log in to the Devvit CLI:
 
-- `src/client/`: React portal UI, animation, responsive renderer
-- `src/server/`: Devvit Web server endpoints and menu actions
-- `src/shared/`: portal configuration and subreddit helpers
-- `public/portals/`: independently replaceable portal backgrounds and icons
-- `public/`: recovered welcome animation assets
-
-## Asset behavior
-
-Portal configuration separates:
-
-```text
-Portal
-├── background
-├── icon
-├── title
-└── animation
+```bash
+npm run login
 ```
 
-The UI renders the title and icon independently of the background. This means replacing an icon does not require editing the banner, and replacing a banner does not require editing the icon.
+## Testing checklist
 
-## Commands
+Before submitting an update for review:
 
-- `npm run dev`: starts a Devvit playtest build/watch flow
-- `npm run build`: builds the client and server
-- `npm run deploy`: builds and uploads a new app version
-- `npm run launch`: deploys and submits the app for review
-- `npm run login`: logs the Devvit CLI into Reddit
-- `npm run type-check`: runs TypeScript checking
+1. Run `npm run type-check`.
+2. Run `npm run build`.
+3. Run `npm run dev` and open the Playtest URL.
+4. Verify the welcome animation loads on desktop and mobile-sized layouts.
+5. Verify the transition from the welcome animation to the portal menu.
+6. Verify image-backed portals preserve their artwork proportions.
+7. Verify gradient-only portals do not show placeholder image backgrounds.
+8. Verify each portal opens only after an explicit user click.
+9. Verify the moderator-only **Create HentaiApp Post** menu action.
+10. Verify the generated custom post opens the normal `default` entrypoint.
+11. Test the experience in both desktop and mobile Reddit clients when possible.
+
+## Project structure
+
+- `src/client/` - React custom-post UI, responsive layout, animation, and portal rendering
+- `src/server/` - Devvit Web server endpoints and the moderator menu endpoint
+- `src/shared/` - portal configuration, navigation destinations, and subreddit helpers
+- `public/portals/` - portal icons and image-backed portal artwork
+- `public/` - welcome animation assets
+- `devvit.json` - Devvit custom-post and subreddit menu configuration
+
+## Configuration
+
+The current Devvit configuration defines:
+
+- a single `default` custom-post entrypoint
+- a server entrypoint for menu/API handling
+- the moderator-only **Create HentaiApp Post** subreddit menu action
+- Reddit permission required for the app's Reddit API operations
+
+For the authoritative implementation, see `devvit.json`, `src/client/MenuApp.tsx`, `src/client/index.css`, `src/server/index.ts`, and `src/shared/subreddit.ts`.
+
+## App review readiness
+
+This README is intended to give reviewers and moderators a plain-language explanation of the app's purpose, operation, navigation behavior, and data practices.
+
+The app should be reviewed together with the current source and its configured destinations. Configuration changes that materially change the app's functionality or policy posture should be reflected here before a new review submission.
+
+Reddit's current Devvit rules require apps to provide a clear, non-vague README describing what the app does, who it is for, and how the full feature set works. See the official Devvit rules and review guidance for current requirements.
