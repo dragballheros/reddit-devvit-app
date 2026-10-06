@@ -50,8 +50,6 @@ export const APP_CONFIG: AppConfig = {
     },
     discord: {
       backgroundGradient: 'linear-gradient(120deg, #f6c453 0%, #b83a3a 48%, #3b1d2a 100%)',
-      background:
-        'https://www.scenichudson.org/wp-content/uploads/2024/12/DSC_9302-Enhanced-NR-1400x933.jpg',
       icon: '/portals/AnimeH34Icon.png',
       accent: '#f0be46',
     },
