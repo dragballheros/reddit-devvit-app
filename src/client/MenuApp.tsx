@@ -235,6 +235,14 @@ export const MenuApp = () => {
       <section className="menu">
         <div className="menu__overlay" />
         <div className="menu__content">
+          <div className="menu__petals" aria-hidden="true">
+            {Array.from({ length: 16 }, (_, index) => (
+              <span
+                key={index}
+                className={`menu__petal menu__petal--${index + 1}`}
+              />
+            ))}
+          </div>
           <header className="menu__header">
             <p className="menu__eyebrow">{subredditLabel}</p>
             <h1 className="menu__title">Welcome {context.username ?? 'traveler'}</h1>
