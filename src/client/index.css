@@ -37,8 +37,53 @@ button { font: inherit; }
   display: flex;
   justify-content: center;
   align-items: center;
-  background-repeat: no-repeat;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 74, 196, 0.34), transparent 30%),
+    radial-gradient(circle at 82% 22%, rgba(92, 123, 255, 0.30), transparent 32%),
+    radial-gradient(circle at 50% 88%, rgba(0, 225, 255, 0.24), transparent 34%),
+    linear-gradient(135deg, #070014 0%, #101447 38%, #071d32 68%, #16051f 100%);
+  background-size: 160% 160%, 180% 180%, 170% 170%, 220% 220%;
+  background-position: 0% 0%, 100% 0%, 50% 100%, 0% 50%;
+  animation: majestic-gradient 18s ease-in-out infinite alternate;
   transition: opacity 0.45s ease;
+}
+
+.menu::before,
+.menu::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.menu::before {
+  background:
+    radial-gradient(ellipse at 25% 35%, rgba(255, 94, 210, 0.22), transparent 24%),
+    radial-gradient(ellipse at 75% 65%, rgba(73, 184, 255, 0.20), transparent 26%);
+  filter: blur(34px);
+  animation: majestic-nebula 15s ease-in-out infinite alternate;
+}
+
+.menu::after {
+  background:
+    conic-gradient(
+      from 90deg at 50% 50%,
+      transparent 0deg,
+      rgba(255, 255, 255, 0.055) 55deg,
+      transparent 105deg,
+      rgba(104, 168, 255, 0.07) 190deg,
+      transparent 255deg,
+      rgba(255, 82, 202, 0.06) 315deg,
+      transparent 360deg
+    );
+  filter: blur(18px);
+  animation: majestic-orbit 24s linear infinite;
+}
+
+.app--ready .menu {
+  animation-duration: 15s;
 }
 
 .menu__overlay {
@@ -340,6 +385,32 @@ button { font: inherit; }
 .intro__title-letter {
   display: inline-block;
   animation: title-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes majestic-gradient {
+  0% {
+    background-position: 0% 10%, 100% 0%, 45% 100%, 0% 50%;
+    filter: saturate(1) brightness(0.92);
+  }
+  50% {
+    background-position: 55% 80%, 20% 35%, 85% 20%, 55% 45%;
+    filter: saturate(1.22) brightness(1.04);
+  }
+  100% {
+    background-position: 100% 25%, 0% 100%, 20% 70%, 100% 55%;
+    filter: saturate(1.35) brightness(1.1);
+  }
+}
+
+@keyframes majestic-nebula {
+  0% { transform: translate3d(-8%, -4%, 0) scale(0.95); opacity: 0.52; }
+  50% { transform: translate3d(4%, 5%, 0) scale(1.08); opacity: 0.82; }
+  100% { transform: translate3d(10%, -2%, 0) scale(1.16); opacity: 0.62; }
+}
+
+@keyframes majestic-orbit {
+  from { transform: rotate(0deg) scale(1.05); }
+  to { transform: rotate(360deg) scale(1.05); }
 }
 
 @keyframes portal-ring {
