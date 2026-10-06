@@ -1,3 +1,9 @@
+export type PortalAsset = {
+  background?: string;
+  icon?: string;
+  accent?: string;
+};
+
 export type AppConfig = {
   introGifDesktop: string;
   introGifDesktopVariants?: string[];
@@ -10,6 +16,12 @@ export type AppConfig = {
     discord: string;
     twitter: string;
     otherSubreddits: string[];
+  };
+  portals: {
+    discord: PortalAsset;
+    modmail: PortalAsset;
+    x: PortalAsset;
+    subreddits: Record<string, PortalAsset>;
   };
 };
 
@@ -24,7 +36,46 @@ export const APP_CONFIG: AppConfig = {
   links: {
     discord: 'https://discord.com/invite/WeWrKMZEa2',
     twitter: 'https://x.com/ElfariaNSFW',
-    otherSubreddits: ['AnimeH34', 'AnimeAI', 'HentaiGIFS'],
+    otherSubreddits: ['AnimeH34', 'AlyaNSFW', 'HentaiGIFS', 'DragonBallNSFW', 'AnimeAI'],
+  },
+  portals: {
+    discord: {
+      icon: '/portals/AnimeH34Icon.png',
+      accent: '#f0be46',
+    },
+    modmail: {
+      accent: '#72bfff',
+    },
+    x: {
+      background: '/portals/ElfariaNSFWBanner.jpg',
+      icon: '/portals/ElfariaNSFWIcon.png',
+      accent: '#f2f2f4',
+    },
+    subreddits: {
+      animeh34: {
+        icon: '/portals/AnimeH34Icon.png',
+        accent: '#f0be46',
+      },
+      alyansfw: {
+        background: '/portals/AlyaNSFWBanner.png',
+        icon: '/portals/AlyaNSFWIcon.jpg',
+        accent: '#ff7dbc',
+      },
+      hentaigifs: {
+        background: '/portals/HentaiGIFSBanner.jpg',
+        icon: '/portals/HentaiGIFSIcon.jpg',
+        accent: '#ff7dbe',
+      },
+      dragonballnsfw: {
+        background: '/portals/DragonBallNSFWBanner.jpg',
+        icon: '/portals/DragonBallNSFWIcon.jpg',
+        accent: '#ff9b37',
+      },
+      animeai: {
+        icon: '/portals/AnimeAIIcon.jpg',
+        accent: '#aa82ff',
+      },
+    },
   },
 };
 
@@ -38,9 +89,7 @@ export const getSubredditTitle = (subredditName?: string | null): string => {
 
 export const getSubredditLabel = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName);
-  if (!normalized) {
-    return 'Hentai';
-  }
+  if (!normalized) return 'Hentai';
 
   return normalized
     .split(/[_-]/)
