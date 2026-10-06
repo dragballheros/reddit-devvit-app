@@ -200,15 +200,7 @@ export const MenuApp = () => {
 
   return (
     <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
-      <section
-        className="menu"
-        style={{
-          backgroundImage: `url(${sessionGifSrc})`,
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundColor: '#000',
-        }}
-      >
+      <section className="menu">
         <div className="menu__overlay" />
         <div className="menu__content">
           <header className="menu__header">
