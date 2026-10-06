@@ -44,7 +44,7 @@ app.post('/api/moderator/create-post', async (c) => {
 
     const post = await reddit.submitCustomPost({
       subredditName,
-      title: 'HentaiApp Portal Demo',
+      title: '\u200B',
       entry: 'default',
     });
 
@@ -88,7 +88,7 @@ app.post('/internal/menu/create-post', async (c) => {
 
     const post = await reddit.submitCustomPost({
       subredditName,
-      title: 'HentaiApp Portal Demo',
+      title: '\u200B',
       entry: 'default',
     });
 
