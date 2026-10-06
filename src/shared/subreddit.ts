@@ -18,6 +18,7 @@ export type AppConfig = {
     otherSubreddits: string[];
   };
   portals: {
+    animeh34: PortalAsset;
     discord: PortalAsset;
     modmail: PortalAsset;
     x: PortalAsset;
@@ -40,6 +41,10 @@ export const APP_CONFIG: AppConfig = {
     otherSubreddits: ['AlyaNSFW', 'HentaiGIFS', 'DragonBallNSFW', 'AnimeAI'],
   },
   portals: {
+    animeh34: {
+      icon: '/portals/AnimeH34Icon.png',
+      accent: '#ff5ca8',
+    },
     discord: {
       icon: '/portals/AnimeH34Icon.png',
       accent: '#f0be46',
