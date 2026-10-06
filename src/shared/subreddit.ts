@@ -56,13 +56,12 @@ export const APP_CONFIG: AppConfig = {
       accent: '#f0be46',
     },
     modmail: {
-      backgroundGradient: 'linear-gradient(120deg, #00e5ff 0%, #147dff 48%, #18285c 100%)',
+      backgroundGradient: 'linear-gradient(120deg, #073a46 0%, #155c73 45%, #071521 100%)',
       icon: '/portals/ModmailIcon.svg',
       accent: '#72bfff',
     },
     x: {
-      backgroundGradient: 'linear-gradient(120deg, #f4f7ff 0%, #7d8cff 42%, #20234d 100%)',
-      background: '/portals/ElfariaNSFWBanner.jpg',
+      backgroundGradient: 'linear-gradient(120deg, #1b1b2f 0%, #3d2c63 45%, #090a12 100%)',
       icon: '/portals/ElfariaNSFWIcon.png',
       accent: '#f2f2f4',
     },
@@ -83,7 +82,7 @@ export const APP_CONFIG: AppConfig = {
         accent: '#ff9b37',
       },
       animeai: {
-        backgroundGradient: 'linear-gradient(120deg, #ff4fd8 0%, #7b4dff 45%, #24134f 100%)',
+        backgroundGradient: 'linear-gradient(120deg, #35124f 0%, #762c78 45%, #12091f 100%)',
         icon: '/portals/AnimeAIIcon.jpg',
         accent: '#aa82ff',
       },
