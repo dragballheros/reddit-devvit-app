@@ -33,12 +33,14 @@ export type ManagedButton = {
 export type ManagedAsset = { id: string; name: string; url: string; type: 'image' | 'gif' };
 
 export type WelcomeGifFit = 'natural' | 'canvas';
+export type BackgroundStyle = 'petals' | 'waterfall' | 'ocean' | 'space' | 'all';
 
 export type AdminConfig = {
   version: 1;
   welcomeGif?: string;
   welcomeGifVariants?: string[];
   welcomeGifFitByUrl?: Record<string, WelcomeGifFit>;
+  backgroundStyle?: BackgroundStyle;
   buttons: ManagedButton[];
   managedSubreddits: string[];
   assets: ManagedAsset[];
@@ -55,6 +57,7 @@ export type AppConfig = {
   welcomeGif?: string;
   welcomeGifVariants?: string[];
   welcomeGifFitByUrl?: Record<string, WelcomeGifFit>;
+  backgroundStyle?: BackgroundStyle;
   buttons?: ManagedButton[];
   links: {
     discord: string;
@@ -128,6 +131,7 @@ export const getDefaultAdminConfig = (): AdminConfig => ({
   welcomeGif: undefined,
   welcomeGifVariants: [],
   welcomeGifFitByUrl: {},
+  backgroundStyle: 'petals',
   managedSubreddits: [],
   assets: [],
   buttons: [],
