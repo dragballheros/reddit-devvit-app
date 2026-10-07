@@ -30,7 +30,7 @@
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create the moderator configuration panel. Open it and use Reddit’s Pin Post To Profile action.",
+        "description": "Create the moderator configuration panel and pin it to the app profile automatically.",
         "location": "post",
         "forUserType": "moderator",
         "postFilter": "currentApp",
