@@ -30,7 +30,7 @@
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create the moderator configuration panel. Pin the resulting post to your profile if desired.",
+        "description": "Create and pin the moderator configuration panel to the app profile.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-admin"
