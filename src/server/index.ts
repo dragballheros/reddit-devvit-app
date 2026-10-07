@@ -60,6 +60,7 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
             : undefined,
         welcomeGifFitByUrl: admin.welcomeGifFitByUrl,
         backgroundStyle: admin.backgroundStyle ?? 'petals',
+        customBackground: admin.customBackground,
         buttons: admin.buttons,
       }
     : APP_CONFIG;
