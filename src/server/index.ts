@@ -246,12 +246,11 @@ app.post('/internal/menu/create-admin', async (c) => {
       subredditName,
       title: '\u200B',
       entry: 'admin',
-      runAs: 'USER',
-      userGeneratedContent: { text: 'Moderator configuration panel.', imageUrls: [] },
       postData: { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() },
     });
+    await post.sticky(3);
     await redis.set(ADMIN_POST_KEY, post.id);
-    return c.json<UiResponse>({ showToast: 'Admin panel created. Pin the post to your profile if desired.' });
+    return c.json<UiResponse>({ showToast: 'Admin panel created and pinned to the app profile.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
     return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
