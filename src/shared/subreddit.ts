@@ -30,11 +30,14 @@ export type ManagedButton = {
   enabled?: boolean;
 };
 
+export type ManagedAsset = { id: string; name: string; url: string; type: 'image' | 'gif' };
+
 export type AdminConfig = {
   version: 1;
   welcomeGif?: string;
   buttons: ManagedButton[];
   managedSubreddits: string[];
+  assets: ManagedAsset[];
 };
 
 export type AppConfig = {
@@ -162,6 +165,7 @@ export const getDefaultAdminConfig = (): AdminConfig => ({
   version: 1,
   welcomeGif: undefined,
   managedSubreddits: [],
+  assets: [],
   buttons: [
     {
       id: 'animeh34',
