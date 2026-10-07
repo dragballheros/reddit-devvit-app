@@ -293,6 +293,23 @@ const fetchCatboxImage = async (initialUrl: string): Promise<Response> => {
   throw new Error('Too many Catbox redirects.');
 };
 
+app.get('/api/catbox-asset', async (c) => {
+  try {
+    const sourceUrl = c.req.query('url')?.trim();
+    if (!sourceUrl || !isAllowedCatboxUrl(sourceUrl)) {
+      return c.json({ error: 'Only HTTPS Catbox image URLs are supported.' }, 400);
+    }
+
+    return await fetchCatboxImage(sourceUrl);
+  } catch (error) {
+    console.error('Failed to proxy Catbox asset', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Unable to load Catbox asset.' },
+      502,
+    );
+  }
+});
+
 app.post('/api/admin/upload-asset', async (c) => {
   try {
     if (!(await requireModerator(context.subredditName))) {
