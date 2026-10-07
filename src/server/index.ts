@@ -30,7 +30,11 @@ const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | un
   const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
   if (!encoded) return undefined;
   const config = decodeConfig(encoded);
-  return { ...config, assets: config.assets ?? [] };
+  return {
+    ...config,
+    assets: config.assets ?? [],
+    backgroundStyle: config.backgroundStyle === 'custom' ? 'custom' : 'petals',
+  };
 };
 
 const getTargetPosts = async (): Promise<TargetPostRecord[]> => {
