@@ -11,7 +11,8 @@
       },
       "admin": {
         "entry": "admin.html",
-        "height": "tall"
+        "height": "tall",
+        "inline": true
       }
     }
   },
@@ -30,7 +31,7 @@
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create the moderator configuration post and automatically pin it to the app profile.",
+        "description": "Create the moderator configuration post in the current test subreddit.",
         "location": "post",
         "forUserType": "moderator",
         "postFilter": "currentApp",
