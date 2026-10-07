@@ -8,6 +8,7 @@ import {
   getSubredditLabel,
   getSubredditTitle,
   normalizeSubredditName,
+  type BackgroundStyle,
 } from '../shared/subreddit';
 
 const INTRO_DURATION_MS = 1900;
@@ -180,6 +181,7 @@ export const MenuApp = () => {
   const [configLoaded, setConfigLoaded] = useState(false);
   const isMobile = useIsMobile();
   const isAndroid = context.client?.name === 'ANDROID';
+  const [activeBackgroundStyle, setActiveBackgroundStyle] = useState<Exclude<BackgroundStyle, 'all'>>('petals');
 
   useEffect(() => {
     let active = true;
@@ -229,6 +231,25 @@ export const MenuApp = () => {
     return () => clearTimeout(timer);
   }, [hasWelcomeGif, isMobile]);
 
+  useEffect(() => {
+    const configuredStyle = config.backgroundStyle ?? 'petals';
+    const styles: Array<Exclude<BackgroundStyle, 'all'>> = ['petals', 'waterfall', 'ocean', 'space'];
+
+    if (configuredStyle !== 'all') {
+      setActiveBackgroundStyle(configuredStyle);
+      return;
+    }
+
+    let index = 0;
+    setActiveBackgroundStyle(styles[index]);
+    const timer = window.setInterval(() => {
+      index = (index + 1) % styles.length;
+      setActiveBackgroundStyle(styles[index]);
+    }, 9000);
+
+    return () => window.clearInterval(timer);
+  }, [config.backgroundStyle]);
+
   const portals = useMemo(() => {
     if (!configLoaded) return [];
 
@@ -270,10 +291,10 @@ export const MenuApp = () => {
   return (
     <AppErrorBoundary>
       <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
-      <section className="menu">
+      <section className={`menu menu--${activeBackgroundStyle}`}>
         <div className="menu__overlay" />
         <div className="menu__content">
-          <div className="menu__petals" aria-hidden="true">
+          <div className={`menu__scene menu__scene--${activeBackgroundStyle}`} aria-hidden="true">
             {Array.from({ length: 16 }, (_, index) => (
               <span
                 key={index}
