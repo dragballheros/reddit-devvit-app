@@ -47,6 +47,8 @@ export type AppConfig = {
   introGifFit: 'contain' | 'cover';
   welcomeGif?: string;
   buttons?: ManagedButton[];
+  welcomeGif?: string;
+  buttons?: ManagedButton[];
   links: {
     discord: string;
     twitter: string;
