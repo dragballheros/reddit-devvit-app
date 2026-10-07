@@ -7,8 +7,8 @@ import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
 
-const ADMIN_POST_KEY = 'hentaiapp:admin-post';
-const TARGET_POSTS_KEY = 'hentaiapp:target-posts';
+const ADMIN_POST_KEY = 'community-portal:admin-post';
+const TARGET_POSTS_KEY = 'community-portal:target-posts';
 
 type RedditPostId = `t3_${string}`;
 
@@ -279,7 +279,7 @@ app.post('/internal/menu/create-post', async (c) => {
       entry: 'default',
     });
 
-    console.log('Created HentaiApp custom post ' + post.id + ' in r/' + subredditName);
+    console.log('Created Portal custom post ' + post.id + ' in r/' + subredditName);
 
     /*
      * submitCustomPost() returns Reddit's relative permalink. The Devvit
