@@ -265,7 +265,7 @@ export const MenuApp = () => {
       onClick: () => {},
       disabled: true,
     }));
-  }, [config.buttons]);
+  }, [config.buttons, configLoaded]);
 
   return (
     <AppErrorBoundary>
