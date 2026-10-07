@@ -65,27 +65,35 @@ export const AdminApp = () => {
       const result = await showForm({
         title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon',
         fields: [
-          { type: 'string', name: 'name', label: 'Asset name', required: true },
-          { type: 'image', name: 'media', label: 'Image or GIF', required: true, helpText: 'Reddit-hosted uploads are limited to 20 MB.' },
+          {
+            type: 'string',
+            name: 'name',
+            label: 'Asset name',
+            required: true,
+          },
+          {
+            type: 'image',
+            name: 'media',
+            label: 'Image or GIF',
+            required: true,
+            helpText: 'Reddit-hosted uploads are limited to 20 MB.',
+          },
         ],
       });
 
       if (!result || result.action === 'CANCELED' || !result.values?.media) return;
 
-      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>('/api/admin/upload-asset', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          url: String(result.values.media),
-          type: kind === 'welcome' ? 'gif' : 'image',
-        }),
-      });
+      const url = String(result.values.media);
+      if (!/^https?:\\/\\/[^\\s]+$/i.test(url)) {
+        showToast('Reddit did not return a usable image URL.');
+        return;
+      }
 
       const asset: ManagedAsset = {
         id: `asset-${Date.now()}`,
         name: String(result.values.name ?? 'Uploaded asset'),
-        url: uploaded.url,
-        type: uploaded.type,
+        url,
+        type: kind === 'welcome' ? 'gif' : 'image',
       };
 
       setConfig((current) => ({
@@ -94,42 +102,19 @@ export const AdminApp = () => {
         ...(kind === 'welcome'
           ? {
               welcomeGif: current.welcomeGifVariants?.[0] ?? current.welcomeGif,
-              welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), uploaded.url],
+              welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), url],
             }
           : {}),
       }));
 
       if (buttonId) {
-        updateButton(buttonId, kind === 'background' ? { background: uploaded.url } : { icon: uploaded.url });
+        updateButton(buttonId, kind === 'background' ? { background: url } : { icon: url });
       }
 
       showToast('Asset uploaded successfully.');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Asset upload failed.');
     }
-  };
-
-  const removeAsset = (assetId: string) => {
-    setConfig((current) => {
-      const asset = current.assets.find((item) => item.id === assetId);
-      if (!asset) return current;
-
-      const nextWelcome = (current.welcomeGifVariants ?? []).filter((url) => url !== asset.url);
-      const welcomeGifWasRemoved = current.welcomeGif === asset.url;
-
-      return {
-        ...current,
-        assets: current.assets.filter((item) => item.id !== assetId),
-        welcomeGif: welcomeGifWasRemoved ? nextWelcome[0] : current.welcomeGif,
-        welcomeGifVariants: nextWelcome,
-        buttons: current.buttons.map((button) => ({
-          ...button,
-          background: button.background === asset.url ? undefined : button.background,
-          icon: button.icon === asset.url ? undefined : button.icon,
-        })),
-      };
-    });
-    showToast('Asset removed. Save & Apply to keep the change.');
   };
 
   const addSubreddit = () => {
