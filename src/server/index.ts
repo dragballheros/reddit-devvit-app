@@ -81,11 +81,12 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
 
 app.get('/api/runtime-config', async (c) => {
   try {
-    const adminPostId = typeof context.postData?.portalAdminPostId === 'string'
+    const explicitAdminPostId = typeof context.postData?.portalAdminPostId === 'string'
       ? toRedditPostId(context.postData.portalAdminPostId)
       : toRedditPostId(context.postData?.portalAdmin === true ? context.postId : undefined);
-    const adminConfig = await getAdminConfigFromPost(adminPostId);
-    return c.json({ config: effectiveConfig(adminConfig), adminPostId: adminPostId ?? null });
+    const fallbackAdminPostId = explicitAdminPostId ?? toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
+    const adminConfig = await getAdminConfigFromPost(fallbackAdminPostId);
+    return c.json({ config: effectiveConfig(adminConfig), adminPostId: fallbackAdminPostId ?? null });
   } catch (error) {
     console.error('Failed to load runtime community navigation config', error);
     return c.json({ config: APP_CONFIG, adminPostId: null });
@@ -242,11 +243,13 @@ app.post('/api/moderator/create-post', async (c) => {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
+    const adminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
     const post = await reddit.submitCustomPost({
       subredditName,
       title: '\u200B',
       entry: 'default',
       nsfw: true,
+      ...(adminPostId ? { postData: { portalAdminPostId: adminPostId } } : {}),
     });
 
     return c.json({
@@ -324,11 +327,13 @@ app.post('/internal/menu/create-post', async (c) => {
 
     console.log('Create post menu action received for r/' + subredditName);
 
+    const adminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
     const post = await reddit.submitCustomPost({
       subredditName,
       title: '\u200B',
       entry: 'default',
       nsfw: true,
+      ...(adminPostId ? { postData: { portalAdminPostId: adminPostId } } : {}),
     });
 
     console.log('Created community navigation custom post ' + post.id + ' in r/' + subredditName);
