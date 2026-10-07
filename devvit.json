@@ -48,7 +48,14 @@
       ]
     },
     "redis": true,
-    "media": true
+    "media": true,
+    "http": {
+      "enable": true,
+      "domains": [
+        "catbox.moe",
+        "files.catbox.moe"
+      ]
+    }
   },
   "scripts": {
     "dev": "vite build --watch",
