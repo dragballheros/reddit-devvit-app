@@ -151,7 +151,7 @@ export const MenuApp = () => {
       .then((payload: { config?: typeof APP_CONFIG }) => {
         if (active && payload.config) setConfig(payload.config);
       })
-      .catch((error) => console.warn('Using bundled portal configuration:', error));
+      .catch((error) => console.warn('Using bundled community navigation configuration:', error));
     return () => { active = false; };
   }, []);
 
@@ -238,7 +238,7 @@ export const MenuApp = () => {
             <h1 className="menu__title">Welcome {context.username ?? 'traveler'}</h1>
           </header>
 
-          <div className="portal-grid" aria-label="Community portals">
+          <div className="portal-grid" aria-label="Community navigation">
             {portals.map((portal, index) => (
               <PortalButton key={portal.label} {...portal} index={index} />
             ))}
