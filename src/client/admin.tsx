@@ -80,19 +80,17 @@ export const AdminApp = () => {
   const uploadMedia = async (kind: 'welcome'|'background'|'icon', buttonId?: string) => {
     try {
       const result = await showForm({
-        form: {
-          title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon',
-          fields: [
-            { type: 'string', name: 'name', label: 'Asset name', required: true },
-            {
-              type: 'image',
-              name: 'media',
-              label: 'Image or GIF',
-              required: true,
-              helpText: 'PNG, JPEG, WEBP, or GIF. Maximum 20 MB.',
-            },
-          ],
-        },
+        title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon',
+        fields: [
+          { type: 'string', name: 'name', label: 'Asset name', required: true },
+          {
+            type: 'image',
+            name: 'media',
+            label: 'Image or GIF',
+            required: true,
+            helpText: 'PNG, JPEG, WEBP, or GIF. Maximum 20 MB.',
+          },
+        ],
       });
 
       if (!result || result.action === 'CANCELED' || !result.values?.media) return;
