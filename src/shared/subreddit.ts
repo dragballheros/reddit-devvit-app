@@ -9,6 +9,34 @@ export type PortalAsset = {
   accent?: string;
 };
 
+export type ManagedButtonType = 'subreddit' | 'discord' | 'modmail' | 'external';
+
+export type ManagedButton = {
+  id: string;
+  label: string;
+  type: ManagedButtonType;
+  url?: string;
+  icon?: string;
+  background?: string;
+  backgroundGradient?: string;
+  accent?: string;
+  labelFont?: string;
+  labelSize?: string;
+  labelColor?: string;
+  labelWeight?: number;
+  backgroundPositionX?: number;
+  backgroundPositionY?: number;
+  backgroundScale?: number;
+  enabled?: boolean;
+};
+
+export type AdminConfig = {
+  version: 1;
+  welcomeGif?: string;
+  buttons: ManagedButton[];
+  managedSubreddits: string[];
+};
+
 export type AppConfig = {
   introGifDesktop: string;
   introGifDesktopVariants?: string[];
@@ -37,7 +65,7 @@ export const APP_CONFIG: AppConfig = {
   introGifDesktopVariants: ['/intro-hentai-desktop.gif', '/intro-desktop.gif'],
   menuGifDesktop: '/hentai-desktop.gif',
   introGifMobile: '/hentai-mobile.gif',
-  introGifMobileVariants: ['/intro-hentai-mobile.gif'],
+  introGifMobileVariants: ['/hentai-mobile.gif'],
   menuGifMobile: '/hentai-mobilebg.gif',
   introGifFit: 'cover',
   links: {
@@ -124,3 +152,66 @@ export const getSubredditLink = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName) || 'hentai';
   return `https://www.reddit.com/r/${normalized}`;
 };
+
+
+export const getDefaultAdminConfig = (): AdminConfig => ({
+  version: 1,
+  welcomeGif: undefined,
+  managedSubreddits: [],
+  buttons: [
+    {
+      id: 'animeh34',
+      label: 'AnimeH34',
+      type: 'subreddit',
+      url: 'https://www.reddit.com/r/AnimeH34/',
+      background: APP_CONFIG.portals.animeh34.background,
+      icon: APP_CONFIG.portals.animeh34.icon,
+      accent: APP_CONFIG.portals.animeh34.accent,
+      enabled: true,
+    },
+    ...APP_CONFIG.links.otherSubreddits.map((name) => {
+      const key = normalizeSubredditName(name);
+      const asset = APP_CONFIG.portals.subreddits[key];
+      return {
+        id: key,
+        label: name,
+        type: 'subreddit' as const,
+        url: `https://www.reddit.com/r/${name}/`,
+        background: asset?.background,
+        backgroundGradient: asset?.backgroundGradient,
+        icon: asset?.icon,
+        accent: asset?.accent,
+        enabled: true,
+      };
+    }),
+    {
+      id: 'x',
+      label: 'X/Twitter (ElfariaNSFW)',
+      type: 'external',
+      url: APP_CONFIG.links.twitter,
+      backgroundGradient: APP_CONFIG.portals.x.backgroundGradient,
+      icon: APP_CONFIG.portals.x.icon,
+      accent: APP_CONFIG.portals.x.accent,
+      enabled: true,
+    },
+    {
+      id: 'discord',
+      label: 'Discord',
+      type: 'discord',
+      url: APP_CONFIG.links.discord,
+      backgroundGradient: APP_CONFIG.portals.discord.backgroundGradient,
+      icon: APP_CONFIG.portals.discord.icon,
+      accent: APP_CONFIG.portals.discord.accent,
+      enabled: true,
+    },
+    {
+      id: 'modmail',
+      label: 'Modmail',
+      type: 'modmail',
+      icon: APP_CONFIG.portals.modmail.icon,
+      backgroundGradient: APP_CONFIG.portals.modmail.backgroundGradient,
+      accent: APP_CONFIG.portals.modmail.accent,
+      enabled: true,
+    },
+  ],
+});
