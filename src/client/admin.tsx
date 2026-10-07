@@ -60,6 +60,15 @@ export const AdminApp = () => {
     buttons: [...current.buttons, { id: `button-${Date.now()}`, label: 'New Button', type: 'external', accent: '#b18cff', backgroundGradient: 'linear-gradient(120deg,#1b1b2f,#3d2c63,#090a12)', enabled: true }],
   }));
 
+  const bytesToBase64 = (bytes: Uint8Array) => {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+    }
+    return btoa(binary);
+  };
+
   const uploadMedia = async (kind: 'welcome'|'background'|'icon', buttonId?: string) => {
     try {
       const result = await showForm({
@@ -94,30 +103,43 @@ export const AdminApp = () => {
         return;
       }
 
-      // Devvit Web requests have a small JSON body limit, so custom uploads
-      // are deliberately kept below 2.5 MB before they reach the server.
-      if (file.size > 2.5 * 1024 * 1024) {
-        showToast('For Asset Library uploads, use an image under 2.5 MB.');
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('Reddit media uploads are limited to 20 MB.');
         return;
       }
 
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => typeof reader.result === 'string'
-          ? resolve(reader.result)
-          : reject(new Error('Could not read the selected image.'));
-        reader.onerror = () => reject(new Error('Could not read the selected image.'));
-        reader.readAsDataURL(file);
-      });
+      const totalBytes = file.size;
+      const chunkBytes = 1.25 * 1024 * 1024;
+      const totalChunks = Math.ceil(totalBytes / chunkBytes);
+      const uploadId = crypto.randomUUID();
 
-      showToast('Uploading asset to Reddit…');
-      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>('/api/admin/upload-asset', {
+      showToast(totalChunks > 1 ? `Uploading asset 0/${totalChunks}…` : 'Uploading asset…');
+
+      for (let index = 0; index < totalChunks; index += 1) {
+        const startByte = index * chunkBytes;
+        const endByte = Math.min(startByte + chunkBytes, totalBytes);
+        const bytes = new Uint8Array(await file.slice(startByte, endByte).arrayBuffer());
+        await api('/api/admin/upload-asset/chunk', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            uploadId,
+            index,
+            totalChunks,
+            totalBytes,
+            type: file.type === 'image/gif' ? 'gif' : 'image',
+            mimeType: file.type,
+            data: bytesToBase64(bytes),
+          }),
+        });
+        showToast(`Uploading asset ${index + 1}/${totalChunks}…`);
+      }
+
+      showToast('Finalizing asset…');
+      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>('/api/admin/upload-asset/finalize', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          dataUrl,
-          type: file.type === 'image/gif' ? 'gif' : 'image',
-        }),
+        body: JSON.stringify({ uploadId }),
       });
 
       const asset: ManagedAsset = {
