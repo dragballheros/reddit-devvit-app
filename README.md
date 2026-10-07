@@ -44,6 +44,11 @@ The moderator **Create Navigation Post** action creates an independent custom po
 
 The admin panel can also create and update managed navigation posts in selected subreddits. Moderation permissions and app installation are required in each target subreddit.
 
+
+## Moderator admin panel
+
+The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the configuration post and pins it to the app account's profile pin slot.
+
 ## Development
 
 Install dependencies and run the type check and build:
