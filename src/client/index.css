@@ -90,6 +90,15 @@ button { font: inherit; }
   animation-duration: 15s;
 }
 
+.app--config-loading .menu,
+.app--intro .menu {
+  visibility: hidden;
+}
+
+.app--ready .menu {
+  visibility: visible;
+}
+
 .menu__overlay {
   position: absolute;
   inset: 0;
