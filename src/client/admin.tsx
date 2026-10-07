@@ -72,7 +72,7 @@ export const AdminApp = () => {
   const uploadMedia = async (kind: 'welcome'|'background'|'icon', buttonId?: string) => {
     try {
       const result = await showForm({
-        title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon',
+        title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? (buttonId ? 'Upload Button Background' : 'Upload Custom Background') : 'Upload Button Icon',
         fields: [
           { type: 'string', name: 'name', label: 'Asset name', required: true },
         ],
