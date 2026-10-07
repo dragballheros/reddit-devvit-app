@@ -118,7 +118,7 @@ const PortalButton = ({
     >
       <span
         className={`portal-button__background${background ? '' : ' portal-button__background--empty'}`}
-        style={{ backgroundImage: background ? `url("${background}")` : backgroundGradient }}
+        style={{ backgroundImage: background ? `url("${background}")` : backgroundGradient, backgroundPosition: `${backgroundPositionX}% ${backgroundPositionY}%`, transform: `scale(${backgroundScale})` }}
         aria-hidden="true"
       />
       <span className="portal-button__vignette" aria-hidden="true" />
@@ -156,13 +156,12 @@ export const MenuApp = () => {
   }, []);
 
   const sessionGifSrc = useMemo(() => {
-    const variants = isMobile
-      ? config.introGifMobileVariants ?? [APP_CONFIG.introGifMobile]
-      : APP_CONFIG.introGifDesktopVariants ?? [APP_CONFIG.introGifDesktop];
-    return pickRandomItem(
-      variants,
-      isMobile ? APP_CONFIG.introGifMobile : APP_CONFIG.introGifDesktop
-    );
+    const variants = config.welcomeGif
+      ? [config.welcomeGif]
+      : isMobile
+        ? config.introGifMobileVariants ?? [config.introGifMobile]
+        : config.introGifDesktopVariants ?? [config.introGifDesktop];
+    return pickRandomItem(variants, isMobile ? config.introGifMobile : config.introGifDesktop);
   }, [isMobile, config]);
 
   const subredditTitle = getSubredditTitle(context.subredditName);
@@ -177,11 +176,34 @@ export const MenuApp = () => {
   }, [isMobile]);
 
   const portals = useMemo(() => {
-    const subredditPortals = APP_CONFIG.links.otherSubreddits
+    if (config.buttons?.length) {
+      return config.buttons
+        .filter((button) => button.enabled !== false)
+        .map((button) => ({
+          label: button.label,
+          background: button.background,
+          backgroundGradient: button.backgroundGradient,
+          icon: button.icon,
+          accent: button.accent,
+          labelFont: button.labelFont,
+          labelSize: button.labelSize,
+          labelColor: button.labelColor,
+          labelWeight: button.labelWeight,
+          backgroundPositionX: button.backgroundPositionX,
+          backgroundPositionY: button.backgroundPositionY,
+          backgroundScale: button.backgroundScale,
+          onClick: () => {
+            if (button.type === 'modmail') navigateTo(getModmailLink(context.subredditName));
+            else if (button.url) navigateTo(button.url);
+          },
+        }));
+    }
+
+    const subredditPortals = config.links.otherSubreddits
       .filter((name) => normalizeSubredditName(name) !== currentSubredditName)
       .map((name) => {
         const key = normalizeSubredditName(name);
-        const asset = APP_CONFIG.portals.subreddits[key];
+        const asset = config.portals.subreddits[key];
         return {
           label: name,
           background: asset?.background,
@@ -199,54 +221,54 @@ export const MenuApp = () => {
     return [
       {
         label: 'AnimeH34',
-        background: APP_CONFIG.portals.animeh34.background,
-        icon: APP_CONFIG.portals.animeh34.icon,
-        accent: APP_CONFIG.portals.animeh34.accent,
-        labelFont: APP_CONFIG.portals.animeh34.labelFont,
-        labelSize: APP_CONFIG.portals.animeh34.labelSize,
-        labelColor: APP_CONFIG.portals.animeh34.labelColor,
-        labelWeight: APP_CONFIG.portals.animeh34.labelWeight,
+        background: config.portals.animeh34.background,
+        icon: config.portals.animeh34.icon,
+        accent: config.portals.animeh34.accent,
+        labelFont: config.portals.animeh34.labelFont,
+        labelSize: config.portals.animeh34.labelSize,
+        labelColor: config.portals.animeh34.labelColor,
+        labelWeight: config.portals.animeh34.labelWeight,
         onClick: () => navigateTo('https://www.reddit.com/r/AnimeH34/'),
       },
       ...subredditPortals,
       {
         label: 'X/Twitter (ElfariaNSFW)',
-        background: APP_CONFIG.portals.x.background,
-        backgroundGradient: APP_CONFIG.portals.x.backgroundGradient,
-        icon: APP_CONFIG.portals.x.icon,
-        accent: APP_CONFIG.portals.x.accent,
-        labelFont: APP_CONFIG.portals.x.labelFont,
-        labelSize: APP_CONFIG.portals.x.labelSize,
-        labelColor: APP_CONFIG.portals.x.labelColor,
-        labelWeight: APP_CONFIG.portals.x.labelWeight,
-        onClick: () => navigateTo(APP_CONFIG.links.twitter),
+        background: config.portals.x.background,
+        backgroundGradient: config.portals.x.backgroundGradient,
+        icon: config.portals.x.icon,
+        accent: config.portals.x.accent,
+        labelFont: config.portals.x.labelFont,
+        labelSize: config.portals.x.labelSize,
+        labelColor: config.portals.x.labelColor,
+        labelWeight: config.portals.x.labelWeight,
+        onClick: () => navigateTo(config.links.twitter),
       },
       {
         label: 'AnimeH34 Discord',
-        background: APP_CONFIG.portals.discord.background,
-        backgroundGradient: APP_CONFIG.portals.discord.backgroundGradient,
-        icon: APP_CONFIG.portals.discord.icon,
-        accent: APP_CONFIG.portals.discord.accent,
-        labelFont: APP_CONFIG.portals.discord.labelFont,
-        labelSize: APP_CONFIG.portals.discord.labelSize,
-        labelColor: APP_CONFIG.portals.discord.labelColor,
-        labelWeight: APP_CONFIG.portals.discord.labelWeight,
-        onClick: () => navigateTo(APP_CONFIG.links.discord),
+        background: config.portals.discord.background,
+        backgroundGradient: config.portals.discord.backgroundGradient,
+        icon: config.portals.discord.icon,
+        accent: config.portals.discord.accent,
+        labelFont: config.portals.discord.labelFont,
+        labelSize: config.portals.discord.labelSize,
+        labelColor: config.portals.discord.labelColor,
+        labelWeight: config.portals.discord.labelWeight,
+        onClick: () => navigateTo(config.links.discord),
       },
       {
         label: 'Modmail',
-        background: APP_CONFIG.portals.modmail.background,
-        backgroundGradient: APP_CONFIG.portals.modmail.backgroundGradient,
-        icon: APP_CONFIG.portals.modmail.icon,
-        accent: APP_CONFIG.portals.modmail.accent,
-        labelFont: APP_CONFIG.portals.modmail.labelFont,
-        labelSize: APP_CONFIG.portals.modmail.labelSize,
-        labelColor: APP_CONFIG.portals.modmail.labelColor,
-        labelWeight: APP_CONFIG.portals.modmail.labelWeight,
+        background: config.portals.modmail.background,
+        backgroundGradient: config.portals.modmail.backgroundGradient,
+        icon: config.portals.modmail.icon,
+        accent: config.portals.modmail.accent,
+        labelFont: config.portals.modmail.labelFont,
+        labelSize: config.portals.modmail.labelSize,
+        labelColor: config.portals.modmail.labelColor,
+        labelWeight: config.portals.modmail.labelWeight,
         onClick: () => navigateTo(modmailLink),
       },
     ];
-  }, [currentSubredditName, modmailLink]);
+  }, [currentSubredditName, modmailLink, config]);
 
   return (
     <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
@@ -282,7 +304,7 @@ export const MenuApp = () => {
           loading="eager"
           decoding="sync"
           fetchPriority="high"
-          style={{ objectFit: APP_CONFIG.introGifFit }}
+          style={{ objectFit: config.introGifFit }}
         />
         <div className="intro__title" aria-label={subredditTitle}>
           {Array.from(subredditTitle).map((char, index) => (
