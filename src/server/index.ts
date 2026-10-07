@@ -10,7 +10,12 @@ const app = new Hono();
 const ADMIN_POST_KEY = 'hentaiapp:admin-post';
 const TARGET_POSTS_KEY = 'hentaiapp:target-posts';
 
-type TargetPostRecord = { subredditName: string; postId: string };
+type RedditPostId = `t3_${string}`;
+
+type TargetPostRecord = { subredditName: string; postId: RedditPostId };
+
+const toRedditPostId = (value?: string): RedditPostId | undefined =>
+  value?.startsWith('t3_') ? value as RedditPostId : undefined;
 
 const encodeConfig = (config: AdminConfig): string =>
   deflateSync(Buffer.from(JSON.stringify(config), 'utf8')).toString('base64');
@@ -19,8 +24,9 @@ const decodeConfig = (value: string): AdminConfig =>
   JSON.parse(inflateSync(Buffer.from(value, 'base64')).toString('utf8')) as AdminConfig;
 
 const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | undefined> => {
-  if (!postId) return undefined;
-  const data = await reddit.getPostData(postId);
+  const redditPostId = toRedditPostId(postId);
+  if (!redditPostId) return undefined;
+  const data = await reddit.getPostData(redditPostId);
   const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
   if (!encoded) return undefined;
   const config = decodeConfig(encoded);
@@ -76,8 +82,8 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
 app.get('/api/runtime-config', async (c) => {
   try {
     const adminPostId = typeof context.postData?.portalAdminPostId === 'string'
-      ? context.postData.portalAdminPostId
-      : context.postData?.portalAdmin === true ? context.postId : undefined;
+      ? toRedditPostId(context.postData.portalAdminPostId)
+      : toRedditPostId(context.postData?.portalAdmin === true ? context.postId : undefined);
     const adminConfig = await getAdminConfigFromPost(adminPostId);
     return c.json({ config: effectiveConfig(adminConfig), adminPostId: adminPostId ?? null });
   } catch (error) {
@@ -132,7 +138,9 @@ app.post('/api/admin/save', async (c) => {
       return c.json({ error: 'Configuration is too large for Reddit post data. Remove unused assets or buttons.' }, 400);
     }
 
-    const adminPost = await reddit.getPostById(context.postId);
+    const adminPostId = toRedditPostId(context.postId);
+    if (!adminPostId) return c.json({ error: 'Invalid Reddit post ID.' }, 400);
+    const adminPost = await reddit.getPostById(adminPostId);
     await adminPost.setPostData({ portalAdmin: true, portalConfig: encoded, updatedAt: Date.now() });
 
     const existing = await getTargetPosts();
@@ -148,14 +156,14 @@ app.post('/api/admin/save', async (c) => {
         const current = bySub.get(subredditName.toLowerCase());
         if (current) {
           const post = await reddit.getPostById(current.postId);
-          await post.setPostData({ portalAdminPostId: context.postId });
+          await post.setPostData({ portalAdminPostId: adminPostId });
           results.push({ subredditName, status: 'updated', postId: current.postId });
         } else {
           const post = await reddit.submitCustomPost({
             subredditName,
             title: '\u200B',
             entry: 'default',
-            postData: { portalAdminPostId: context.postId },
+            postData: { portalAdminPostId: adminPostId },
           });
           bySub.set(subredditName.toLowerCase(), { subredditName, postId: post.id });
           results.push({ subredditName, status: 'created', postId: post.id });
