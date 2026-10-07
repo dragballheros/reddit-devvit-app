@@ -45,6 +45,8 @@ export type AppConfig = {
   introGifMobileVariants?: string[];
   menuGifMobile: string;
   introGifFit: 'contain' | 'cover';
+  welcomeGif?: string;
+  buttons?: ManagedButton[];
   links: {
     discord: string;
     twitter: string;
