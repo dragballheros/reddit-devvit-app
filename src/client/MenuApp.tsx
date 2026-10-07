@@ -295,12 +295,101 @@ export const MenuApp = () => {
         <div className="menu__overlay" />
         <div className="menu__content">
           <div className={`menu__scene menu__scene--${activeBackgroundStyle}`} aria-hidden="true">
-            {Array.from({ length: 16 }, (_, index) => (
-              <span
-                key={index}
-                className={`menu__petal menu__petal--${index + 1}`}
-              />
+            {activeBackgroundStyle === 'petals' && Array.from({ length: 16 }, (_, index) => (
+              <span key={index} className={`menu__petal menu__petal--${index + 1}`} />
             ))}
+
+            {activeBackgroundStyle === 'waterfall' && (
+              <>
+                <span className="waterfall__moon" />
+                <span className="waterfall__mist" />
+                {Array.from({ length: 28 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="waterfall__stream"
+                    style={{
+                      '--waterfall-left': `${(index * 17) % 103}%`,
+                      '--waterfall-delay': `-${(index % 11) * 0.63}s`,
+                      '--waterfall-duration': `${4.8 + (index % 6) * 0.65}s`,
+                      '--waterfall-height': `${45 + (index % 8) * 7}%`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+                {Array.from({ length: 18 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="waterfall__spark"
+                    style={{
+                      '--waterfall-left': `${(index * 23) % 100}%`,
+                      '--waterfall-delay': `-${(index % 9) * 0.8}s`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+              </>
+            )}
+
+            {activeBackgroundStyle === 'ocean' && (
+              <>
+                <span className="ocean__sun-glow" />
+                <span className="ocean__horizon" />
+                <span className="ocean__wave ocean__wave--one" />
+                <span className="ocean__wave ocean__wave--two" />
+                <span className="ocean__wave ocean__wave--three" />
+                {Array.from({ length: 22 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="ocean__bubble"
+                    style={{
+                      '--ocean-left': `${(index * 19) % 101}%`,
+                      '--ocean-delay': `-${(index % 12) * 0.72}s`,
+                      '--ocean-duration': `${5.5 + (index % 7) * 0.8}s`,
+                      '--ocean-size': `${4 + (index % 5) * 2}px`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+                {Array.from({ length: 10 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="ocean__shimmer"
+                    style={{
+                      '--ocean-left': `${(index * 31) % 100}%`,
+                      '--ocean-delay': `-${(index % 7) * 1.1}s`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+              </>
+            )}
+
+            {activeBackgroundStyle === 'space' && (
+              <>
+                <span className="space__nebula space__nebula--one" />
+                <span className="space__nebula space__nebula--two" />
+                <span className="space__nebula space__nebula--three" />
+                {Array.from({ length: 70 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="space__star"
+                    style={{
+                      '--space-left': `${(index * 37) % 101}%`,
+                      '--space-top': `${(index * 61) % 97}%`,
+                      '--space-delay': `-${(index % 13) * 0.47}s`,
+                      '--space-size': `${1 + (index % 4) * 0.75}px`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+                {Array.from({ length: 5 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="space__shooting-star"
+                    style={{
+                      '--space-left': `${10 + (index * 19) % 78}%`,
+                      '--space-top': `${10 + (index * 17) % 55}%`,
+                      '--space-delay': `-${index * 2.6}s`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+              </>
+            )}
           </div>
           <header className="menu__header">
             <p className="menu__eyebrow">{subredditLabel}</p>
