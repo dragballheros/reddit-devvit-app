@@ -26,6 +26,9 @@ type PortalButtonProps = {
   labelWeight?: number;
   index: number;
   disabled?: boolean;
+  backgroundPositionX?: number;
+  backgroundPositionY?: number;
+  backgroundScale?: number;
 };
 
 const pickRandomItem = (items: string[], fallback: string) => {
@@ -90,6 +93,9 @@ const PortalButton = ({
   labelWeight,
   index,
   disabled = false,
+  backgroundPositionX = 50,
+  backgroundPositionY = 50,
+  backgroundScale = 1,
 }: PortalButtonProps) => {
   return (
     <button
@@ -134,18 +140,30 @@ const PortalButton = ({
 
 export const MenuApp = () => {
   const [isIntroHidden, setIsIntroHidden] = useState(false);
+  const [config, setConfig] = useState(APP_CONFIG);
   const isMobile = useIsMobile();
   const isAndroid = context.client?.name === 'ANDROID';
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/runtime-config')
+      .then((response) => response.json())
+      .then((payload: { config?: typeof APP_CONFIG }) => {
+        if (active && payload.config) setConfig(payload.config);
+      })
+      .catch((error) => console.warn('Using bundled portal configuration:', error));
+    return () => { active = false; };
+  }, []);
+
   const sessionGifSrc = useMemo(() => {
     const variants = isMobile
-      ? APP_CONFIG.introGifMobileVariants ?? [APP_CONFIG.introGifMobile]
+      ? config.introGifMobileVariants ?? [APP_CONFIG.introGifMobile]
       : APP_CONFIG.introGifDesktopVariants ?? [APP_CONFIG.introGifDesktop];
     return pickRandomItem(
       variants,
       isMobile ? APP_CONFIG.introGifMobile : APP_CONFIG.introGifDesktop
     );
-  }, [isMobile]);
+  }, [isMobile, config]);
 
   const subredditTitle = getSubredditTitle(context.subredditName);
   const subredditLabel = getSubredditLabel(context.subredditName);
