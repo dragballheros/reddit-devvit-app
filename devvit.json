@@ -40,7 +40,8 @@
   "permissions": {
     "reddit": {
       "enable": true,
-      "scope": "moderator"
+      "scope": "moderator",
+      "asUser": ["SUBMIT_POST"]
     },
     "redis": true,
     "media": true
