@@ -242,8 +242,7 @@ app.post('/internal/menu/create-admin', async (c) => {
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
       const existingPost = await reddit.getPostById(existing as RedditPostId);
-      await existingPost.sticky(3);
-      return c.json<UiResponse>({ showToast: 'Admin panel is pinned to the app profile.' });
+      return c.json<UiResponse>({ showToast: 'Admin panel already exists. Open it from the app profile and use Reddit’s Pin Post To Profile action.' });
     }
     const config = getDefaultAdminConfig();
     const post = await reddit.submitCustomPost({
@@ -252,9 +251,8 @@ app.post('/internal/menu/create-admin', async (c) => {
       entry: 'admin',
       postData: { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() },
     });
-    await post.sticky(3);
     await redis.set(ADMIN_POST_KEY, post.id);
-    return c.json<UiResponse>({ showToast: 'Admin panel created and pinned to the app profile.' });
+    return c.json<UiResponse>({ showToast: 'Admin panel created. Open the post and use Pin Post To Profile.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
     return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
