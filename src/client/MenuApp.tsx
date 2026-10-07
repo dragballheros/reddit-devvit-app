@@ -1,7 +1,7 @@
 import './index.css';
 
 import { context, navigateTo } from '@devvit/web/client';
-import { useEffect, useMemo, useState } from 'react';
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   APP_CONFIG,
   getModmailLink,
@@ -12,6 +12,34 @@ import {
 
 const INTRO_DURATION_MS = 1900;
 const MOBILE_INTRO_DURATION_MS = 1900;
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Community navigation render error', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg, #070014, #101447 45%, #071d32)', color: 'white', fontFamily: 'system-ui, sans-serif' }}>
+          <div style={{ maxWidth: 620, width: '100%', padding: 24, borderRadius: 24, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(0,0,0,.55)', boxShadow: '0 20px 60px rgba(0,0,0,.45)' }}>
+            <h1 style={{ margin: 0, fontSize: 24 }}>Community Navigation</h1>
+            <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,.75)', lineHeight: 1.5 }}>The navigation interface encountered a rendering error.</p>
+            <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,.5)', fontSize: 12, wordBreak: 'break-word' }}>{this.state.error.message}</p>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 type PortalButtonProps = {
   label: string;
@@ -221,7 +249,8 @@ export const MenuApp = () => {
   }, [config.buttons]);
 
   return (
-    <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
+    <AppErrorBoundary>
+      <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
       <section className="menu">
         <div className="menu__overlay" />
         <div className="menu__content">
@@ -255,6 +284,7 @@ export const MenuApp = () => {
             loading="eager"
             decoding="sync"
             fetchPriority="high"
+            onError={() => setIsIntroHidden(true)}
             style={{ objectFit: config.introGifFit }}
           />
           <div className="intro__title" aria-label={subredditTitle}>
@@ -270,6 +300,7 @@ export const MenuApp = () => {
           </div>
         </section>
       )}
-    </div>
+      </div>
+    </AppErrorBoundary>
   );
 };
