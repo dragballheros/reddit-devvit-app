@@ -1,57 +1,99 @@
 # Community Navigation for Reddit
 
-A reusable Reddit Devvit custom post that gives moderators a configurable community navigation page.
+Community Navigation is a reusable Reddit Devvit custom post that gives subreddit moderators a configurable navigation page. It is designed for communities that want a simple, branded way to direct members to other subreddits, Discord servers, Modmail, or other approved destinations.
 
-## What it provides
+The app is community-configured. It does not ship with community-specific links, artwork, icons, banners, or welcome media.
 
-- A moderator-only admin panel for configuring the community navigation.
-- Custom buttons with labels, destinations, icons, backgrounds, gradients, colors, and layout controls.
-- Optional welcome GIFs, including multiple GIFs selected randomly on each post load or refresh.
-- If no welcome GIF is configured, the navigation opens directly to the button section.
-- A moderator menu action for creating a community navigation post for review or testing.
-- A second moderator menu action for creating the configuration/admin post.
-- A managed subreddit list that lets moderators apply the same configuration to multiple communities where the app is installed.
-- A minimal default configuration with no community-specific links or bundled artwork.
+## What the app provides
 
-## Configuration model
+- A moderator-only **Community Navigation Admin** panel.
+- Configurable navigation buttons with labels, destination URLs, button types, icons, backgrounds, gradients, colors, and background positioning/scaling.
+- Optional welcome GIFs, including multiple GIFs chosen randomly when the navigation post loads or refreshes.
+- An Asset Library for reusable uploaded images/GIFs, including asset deletion and automatic removal of deleted-asset references.
+- Placeholder buttons (**Subreddit 1** through **Subreddit 4**) when no navigation buttons have been configured, so a new installation never looks like an empty shell.
+- A moderator action for creating a new Community Navigation post for testing or review.
+- A moderator action for creating or recreating the Community Navigation Admin panel.
+- Managed subreddit support so one configuration can create or update navigation posts in multiple subreddits where the app is installed and the moderator has the required permissions.
 
-The repository intentionally contains no community-specific destination links, icons, banners, or welcome media.
+Uploaded media uses Reddit/Devvit's media pipeline. The app does not depend on external media hosts.
 
-Each community supplies its own configuration through the admin panel. This keeps the project reusable instead of tying the code to a particular subreddit, brand, Discord server, social account, or artwork collection.
+## How moderators use the app
 
-### Welcome media
+### 1. Create the admin panel
 
-Welcome GIFs are optional.
+Install or playtest the app in a subreddit you moderate.
 
-- Add one GIF to show a single welcome animation.
-- Add multiple GIFs to randomly select one whenever the post loads or refreshes.
-- Remove all GIFs to skip the welcome screen and show the configured buttons immediately.
+From the app's custom-post menu, choose **Create Navigation Admin Panel**. The app creates a fresh configuration post in the current subreddit. When the action is run again, the previous admin post is removed when possible and a fresh configuration post is created.
 
-### Navigation buttons
+The admin panel is accessed from the app's own custom-post menu. Reddit profile pinning is not performed automatically. Moderators can use Reddit's normal post pin controls when they want the configuration post pinned.
 
-Moderators can create and customize buttons for:
+### 2. Configure the welcome screen
 
-- Subreddits
-- Discord servers
-- Modmail
-- Custom external links
+In **Welcome Screen**:
 
-Buttons can optionally use uploaded Reddit-hosted media or CSS gradients. A button without an image uses its configured gradient.
+- Add one or more welcome GIFs.
+- Multiple GIFs are randomly selected when the post loads or refreshes.
+- Remove all welcome GIFs to skip the intro and go directly to the navigation buttons.
+
+### 3. Configure navigation buttons
+
+Use **+ Add Button** to create a button.
+
+Supported button types are:
+
+- **Subreddit**
+- **Discord**
+- **Modmail**
+- **Custom Link**
+
+Each button can have a label, destination, accent color, gradient, optional icon, and optional background image. Background position and scale can also be adjusted.
+
+### 4. Manage reusable assets
+
+The **Asset Library** stores reusable Reddit-hosted images and GIFs.
+
+Use **Upload Background** or **Upload Icon** from a button, or upload welcome media from the Welcome Screen. Existing assets can then be selected from the button's **Existing Background** and **Existing Icon** controls.
+
+Use **Delete** in the Asset Library to remove an asset from the app configuration. Deleting an asset also clears button references to that asset. Changes are persisted with **Save & Apply**.
+
+### 5. Apply the configuration
+
+Click **Save & Apply**.
+
+The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the moderator must have the necessary moderation permissions there.
+
+### 6. Create a standalone test/review post
+
+The moderator **Create Navigation Post** action creates a separate Community Navigation post for testing or review. This does not replace the administrator configuration post.
+
+## Configuration behavior
+
+The app is intentionally reusable across communities. A fresh installation has no community-specific destinations or media configured.
+
+When there are no configured buttons, the app shows four disabled placeholders:
+
+**Subreddit 1**, **Subreddit 2**, **Subreddit 3**, and **Subreddit 4**.
+
+This makes the initial experience clear to moderators and reviewers while they configure the app.
 
 ## Review and testing
 
-The moderator **Create Navigation Post** action creates an independent custom post so the community navigation can be reviewed or tested without changing the administrator configuration.
+Before publishing, test the full moderator and member flows in a sandbox subreddit:
 
-The admin panel can also create and update managed navigation posts in selected subreddits. Moderation permissions and app installation are required in each target subreddit.
-
-
-## Moderator admin panel
-
-The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the zero-title configuration post in the current subreddit as required by Devvit. The configuration post can be pinned using Reddit's normal post pinning controls.
+1. Create the admin panel.
+2. Open the admin panel from the custom-post menu.
+3. Add and remove welcome GIFs.
+4. Add, edit, and remove navigation buttons.
+5. Upload an image/GIF to the Asset Library.
+6. Delete an asset and confirm its button references are cleared.
+7. Save and apply the configuration.
+8. Create a standalone test navigation post.
+9. Refresh the navigation post and confirm saved configuration persists.
+10. Test both mobile and web layouts.
 
 ## Development
 
-Install dependencies and run the type check and build:
+Install dependencies and run the project checks:
 
 ```bash
 npm install
@@ -62,7 +104,25 @@ npm run build
 For Devvit runtime testing:
 
 ```bash
-npm run dev
+npx devvit playtest
 ```
 
-The project is intended to be configured per community rather than shipped with a preconfigured set of destinations or media.
+To create an installable app version:
+
+```bash
+npx devvit upload
+```
+
+To submit a version for Reddit review:
+
+```bash
+npx devvit publish
+```
+
+For public App Directory distribution, submit with:
+
+```bash
+npx devvit publish --public
+```
+
+The repository's source configuration is the authoritative implementation. Reviewers can use the moderator actions and the admin panel described above to exercise the app's complete feature set.
