@@ -47,7 +47,8 @@
         "SUBMIT_POST"
       ]
     },
-    "redis": true
+    "redis": true,
+    "media": true
   },
   "scripts": {
     "dev": "vite build --watch",
