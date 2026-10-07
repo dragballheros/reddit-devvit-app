@@ -43,7 +43,18 @@ const isValidAdminConfig = (value: unknown): value is AdminConfig => {
 };
 
 const effectiveConfig = (admin?: AdminConfig): AppConfig =>
-  admin ? { ...APP_CONFIG, welcomeGif: admin.welcomeGif, buttons: admin.buttons } : APP_CONFIG;
+  admin
+    ? {
+        ...APP_CONFIG,
+        welcomeGif: admin.welcomeGifVariants?.[0] ?? admin.welcomeGif,
+        welcomeGifVariants: admin.welcomeGifVariants?.length
+          ? admin.welcomeGifVariants
+          : admin.welcomeGif
+            ? [admin.welcomeGif]
+            : undefined,
+        buttons: admin.buttons,
+      }
+    : APP_CONFIG;
 
 const requireModerator = async (subredditName?: string) =>
   Boolean(subredditName && await isCurrentUserModerator(subredditName));
