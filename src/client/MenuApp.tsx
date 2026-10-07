@@ -267,13 +267,9 @@ export const MenuApp = () => {
     }));
   }, [config.buttons]);
 
-  if (!configLoaded) {
-    return <div className="app app--loading" aria-busy="true" aria-label="Loading community navigation" />;
-  }
-
   return (
     <AppErrorBoundary>
-      <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
+      <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
       <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
         <div className="menu__overlay" />
         <div className="menu__content">
