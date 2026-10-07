@@ -64,7 +64,7 @@ The app stores the configuration in the admin post and creates or updates manage
 
 ### 6. Create a standalone test/review post
 
-The moderator **Create Navigation Post** action creates a separate Community Navigation post for testing or review. This does not replace the administrator configuration post.
+The moderator **Create Navigation Post** action creates a Community Navigation post for testing or review using the current saved administrator configuration. The administrator configuration post remains separate.
 
 ## Configuration behavior
 
