@@ -1,44 +1,11 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis } from '@devvit/web/server';
-import { getDevvitConfig } from '@devvit/shared-types/server/get-devvit-config.js';
-import { LinksAndCommentsDefinition, type LinksAndComments } from '@devvit/protos/types/devvit/plugin/redditapi/linksandcomments/linksandcomments_svc.js';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { APP_CONFIG, getDefaultAdminConfig, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const pinPostToAppProfile = async (postId: RedditPostId): Promise<void> => {
-  const delays = [0, 1000, 2500, 5000];
-  let lastError: unknown;
-  const linksAndComments = getDevvitConfig().use<LinksAndComments>(LinksAndCommentsDefinition);
-
-  for (const delay of delays) {
-    if (delay > 0) await sleep(delay);
-
-    try {
-      await linksAndComments.SetSubredditSticky(
-        {
-          id: postId,
-          state: true,
-          num: 3,
-          toProfile: true,
-        } as never,
-        context.metadata
-      );
-      console.log('Pinned admin post ' + postId + ' to the app profile.');
-      return;
-    } catch (error) {
-      lastError = error;
-      console.warn('Profile pin attempt failed for ' + postId + '; retrying.', error);
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Failed to pin admin post to the app profile.');
-};
 
 const ADMIN_POST_KEY = 'community-portal:admin-post';
 const TARGET_POSTS_KEY = 'community-portal:target-posts';
@@ -274,9 +241,9 @@ app.post('/internal/menu/create-admin', async (c) => {
     }
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
-      await pinPostToAppProfile(existing as RedditPostId);
-      return c.json<UiResponse>({ showToast: 'Admin panel is pinned to the app profile.' });
+      return c.json<UiResponse>({ showToast: 'Admin panel already exists in the test subreddit.' });
     }
+
     const config = getDefaultAdminConfig();
     const post = await reddit.submitCustomPost({
       subredditName,
@@ -284,9 +251,10 @@ app.post('/internal/menu/create-admin', async (c) => {
       entry: 'admin',
       postData: { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() },
     });
+
     await redis.set(ADMIN_POST_KEY, post.id);
-    await pinPostToAppProfile(post.id);
-    return c.json<UiResponse>({ showToast: 'Admin panel created and pinned to the app profile.' });
+    console.log('Created admin panel custom post ' + post.id + ' in r/' + subredditName);
+    return c.json<UiResponse>({ showToast: 'Admin panel created in the test subreddit.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
     return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
