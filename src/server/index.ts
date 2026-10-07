@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { createServer, getServerPort, reddit, context, redis } from '@devvit/web/server';
+import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { APP_CONFIG, getDefaultAdminConfig, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
@@ -182,6 +182,36 @@ app.post('/api/admin/save', async (c) => {
   } catch (error) {
     console.error('Failed to save admin config', error);
     return c.json({ error: 'Failed to save and apply the configuration.' }, 500);
+  }
+});
+
+app.post('/api/admin/upload-asset', async (c) => {
+  try {
+    if (!(await requireModerator(context.subredditName))) {
+      return c.json({ error: 'Moderator access required.' }, 403);
+    }
+
+    const payload = await c.req.json<{ url?: string; type?: 'image' | 'gif' }>();
+    if (!payload.url || !['image', 'gif'].includes(payload.type ?? '')) {
+      return c.json({ error: 'Invalid media.' }, 400);
+    }
+
+    const uploaded = await media.upload({
+      url: payload.url,
+      type: payload.type,
+    });
+
+    if (!uploaded.mediaUrl) {
+      return c.json({ error: 'Reddit did not return a usable media URL.' }, 502);
+    }
+
+    return c.json({ url: uploaded.mediaUrl, type: payload.type });
+  } catch (error) {
+    console.error('Failed to upload admin asset to Reddit Media API', error);
+    return c.json(
+      { error: 'Reddit could not finish the image upload. Try the image again or use a smaller file.' },
+      502,
+    );
   }
 });
 
