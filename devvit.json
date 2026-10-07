@@ -7,7 +7,7 @@
       "default": {
         "inline": true,
         "entry": "splash.html",
-        "height": "tall"
+        "height": "regular"
       },
       "admin": {
         "entry": "admin.html",
