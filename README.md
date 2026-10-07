@@ -64,6 +64,13 @@ The app requests the following HTTP fetch domains:
 
 The OpenAI API key is stored as an app-global secret named `OPENAI_API_KEY` and is read only by the server.
 
+After the app has been uploaded/installed at least once, set the secret with:
+
+```bash
+npx devvit settings set OPENAI_API_KEY
+```
+
+
 ## Development
 
 Install dependencies and run the type check and build:
