@@ -194,26 +194,49 @@ app.post('/api/admin/upload-asset', async (c) => {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
-    const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
-    const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
+    const payload = await c.req.json<{
+      dataUrl?: string;
+      sourceUrl?: string;
+      type?: 'image' | 'gif';
+    }>();
     const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
-    const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
 
-    if (!mediaType || !match) {
-      return c.json({ error: 'Invalid image data.' }, 400);
+    if (!mediaType) {
+      return c.json({ error: 'Invalid media type.' }, 400);
     }
 
-    const base64 = match[2];
-    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
-    const byteLength = Math.floor((base64.length * 3) / 4) - padding;
-    if (byteLength > 2.5 * 1024 * 1024) {
-      return c.json({ error: 'Asset exceeds the 2.5 MB Asset Library upload limit.' }, 413);
+    let uploadUrl = '';
+    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl) {
+      try {
+        const parsed = new URL(payload.sourceUrl);
+        const host = parsed.hostname.toLowerCase();
+        if (parsed.protocol !== 'https:' || !['catbox.moe', 'files.catbox.moe'].includes(host)) {
+          return c.json({ error: 'Only direct HTTPS Catbox links are allowed.' }, 400);
+        }
+        uploadUrl = parsed.toString();
+      } catch {
+        return c.json({ error: 'Invalid Catbox URL.' }, 400);
+      }
+    } else {
+      const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
+      const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        return c.json({ error: 'Invalid image data.' }, 400);
+      }
+
+      const base64 = match[2];
+      const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+      const byteLength = Math.floor((base64.length * 3) / 4) - padding;
+      if (byteLength > 2.5 * 1024 * 1024) {
+        return c.json({ error: 'Local Asset Library uploads are limited to 2.5 MB by the Devvit Web request size.' }, 413);
+      }
+      uploadUrl = dataUrl;
     }
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        const uploaded = await media.upload({ url: dataUrl, type: mediaType });
+        const uploaded = await media.upload({ url: uploadUrl, type: mediaType });
         if (uploaded.mediaUrl) {
           return c.json({ url: uploaded.mediaUrl, type: mediaType });
         }
@@ -226,6 +249,13 @@ app.post('/api/admin/upload-asset', async (c) => {
       if (attempt < 3) await sleep(attempt * 2000);
     }
 
+    const details = lastError instanceof Error ? lastError.message : 'unknown error';
+    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl) {
+      return c.json({
+        error: `Reddit could not import this Catbox asset. Reddit runtime media is limited to 20 MB, so a Catbox file over 20 MB cannot be stored as a Reddit-hosted app asset. Details: ${details}`,
+      }, 502);
+    }
+
     throw lastError instanceof Error ? lastError : new Error('Reddit media upload failed.');
   } catch (error) {
     console.error('Failed to upload admin asset to Reddit Media API after retries', error);
@@ -233,7 +263,6 @@ app.post('/api/admin/upload-asset', async (c) => {
     return c.json({ error: `Reddit media upload failed after 3 attempts: ${message}` }, 502);
   }
 });
-
 app.post('/api/moderator/create-post', async (c) => {
   try {
     const subredditName = context.subredditName;
