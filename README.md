@@ -27,6 +27,12 @@ Welcome GIFs are optional.
 - Add multiple GIFs to randomly select one whenever the post loads or refreshes.
 - Remove all GIFs to skip the welcome screen and show the configured buttons immediately.
 
+### Upload safety filter
+
+All image and GIF assets are screened server-side with OpenAI's moderation API before they can be added to the Asset Library. Explicit sexual content, sexual content involving minors, and graphic violence are rejected. Moderation failures fail closed, so an image is not accepted when it cannot be verified.
+
+Catbox button media is also screened before the Catbox URL is saved. Catbox-hosted files remain on Catbox and are rendered through the app's same-origin proxy, which allows large files to exceed Reddit's 20 MB runtime media upload limit without uploading those large files to Reddit.
+
 ### Navigation buttons
 
 Moderators can create and customize buttons for:
@@ -48,6 +54,15 @@ The admin panel can also create and update managed navigation posts in selected 
 ## Moderator admin panel
 
 The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the zero-title configuration post in the current subreddit as required by Devvit. The configuration post can be pinned using Reddit's normal post pinning controls.
+
+## Fetch Domains
+
+The app requests the following HTTP fetch domains:
+
+- `catbox.moe` and `files.catbox.moe` - server-side proxying of moderator-supplied Catbox image assets.
+- `api.openai.com` - server-side image safety screening with OpenAI's `omni-moderation-latest` moderation endpoint.
+
+The OpenAI API key is stored as an app-global secret named `OPENAI_API_KEY` and is read only by the server.
 
 ## Development
 
