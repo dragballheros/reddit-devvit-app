@@ -8,6 +8,10 @@
         "inline": true,
         "entry": "splash.html",
         "height": "tall"
+      },
+      "admin": {
+        "entry": "admin.html",
+        "height": "tall"
       }
     }
   },
@@ -23,11 +27,23 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-post"
+      },
+      {
+        "label": "Create HentaiApp Admin Panel",
+        "description": "Create the moderator configuration panel. Pin the resulting post to your profile if desired.",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/create-admin"
       }
     ]
   },
   "permissions": {
-    "reddit": true
+    "reddit": {
+      "enable": true,
+      "scope": "moderator"
+    },
+    "redis": true,
+    "media": true
   },
   "scripts": {
     "dev": "vite build --watch",
