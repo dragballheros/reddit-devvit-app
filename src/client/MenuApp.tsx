@@ -155,16 +155,17 @@ export const MenuApp = () => {
     return () => { active = false; };
   }, []);
 
-  const sessionGifSrc = useMemo(() => {
-    const configuredWelcomeGifs = (config.welcomeGifVariants ?? (config.welcomeGif ? [config.welcomeGif] : []))
-      .filter((url): url is string => typeof url === 'string' && url.trim().length > 0);
-    const variants = configuredWelcomeGifs.length
-      ? configuredWelcomeGifs
-      : isMobile
-        ? config.introGifMobileVariants ?? [config.introGifMobile]
-        : config.introGifDesktopVariants ?? [config.introGifDesktop];
-    return pickRandomItem(variants, isMobile ? config.introGifMobile : config.introGifDesktop);
-  }, [isMobile, config]);
+  const configuredWelcomeGifs = useMemo(
+    () =>
+      (config.welcomeGifVariants ?? (config.welcomeGif ? [config.welcomeGif] : []))
+        .filter((url): url is string => typeof url === 'string' && url.trim().length > 0),
+    [config],
+  );
+  const hasWelcomeGif = configuredWelcomeGifs.length > 0;
+  const sessionGifSrc = useMemo(
+    () => pickRandomItem(configuredWelcomeGifs, ''),
+    [configuredWelcomeGifs],
+  );
 
   const subredditTitle = getSubredditTitle(context.subredditName);
   const subredditLabel = getSubredditLabel(context.subredditName);
@@ -172,10 +173,16 @@ export const MenuApp = () => {
   const currentSubredditName = normalizeSubredditName(context.subredditName);
 
   useEffect(() => {
+    if (!hasWelcomeGif) {
+      setIsIntroHidden(true);
+      return;
+    }
+
+    setIsIntroHidden(false);
     const duration = isMobile ? MOBILE_INTRO_DURATION_MS : INTRO_DURATION_MS;
     const timer = setTimeout(() => setIsIntroHidden(true), duration);
     return () => clearTimeout(timer);
-  }, [isMobile]);
+  }, [hasWelcomeGif, isMobile]);
 
   const portals = useMemo(() => {
     if (config.buttons?.length) {
@@ -298,28 +305,30 @@ export const MenuApp = () => {
         </div>
       </section>
 
-      <section className={`intro ${isIntroHidden ? 'intro--hidden' : ''}`}>
-        <img
-          className="intro__media intro__media--wide"
-          src={sessionGifSrc}
-          alt="Welcome animation"
-          loading="eager"
-          decoding="sync"
-          fetchPriority="high"
-          style={{ objectFit: config.introGifFit }}
-        />
-        <div className="intro__title" aria-label={subredditTitle}>
-          {Array.from(subredditTitle).map((char, index) => (
-            <span
-              key={`${char}-${index}`}
-              className="intro__title-letter"
-              style={{ animationDelay: `${index * 0.06}s` }}
-            >
-              {char === ' ' ? '\u00A0' : char}
-            </span>
-          ))}
-        </div>
-      </section>
+      {hasWelcomeGif && (
+        <section className={`intro ${isIntroHidden ? 'intro--hidden' : ''}`}>
+          <img
+            className="intro__media intro__media--wide"
+            src={sessionGifSrc}
+            alt="Welcome animation"
+            loading="eager"
+            decoding="sync"
+            fetchPriority="high"
+            style={{ objectFit: config.introGifFit }}
+          />
+          <div className="intro__title" aria-label={subredditTitle}>
+            {Array.from(subredditTitle).map((char, index) => (
+              <span
+                key={`${char}-${index}`}
+                className="intro__title-letter"
+                style={{ animationDelay: `${index * 0.06}s` }}
+              >
+                {char === ' ' ? '\u00A0' : char}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };
