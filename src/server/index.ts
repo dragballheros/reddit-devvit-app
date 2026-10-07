@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { createServer, getServerPort, reddit, context, redis } from '@devvit/web/server';
+import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { APP_CONFIG, getDefaultAdminConfig, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
@@ -185,6 +185,54 @@ app.post('/api/admin/save', async (c) => {
   }
 });
 
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+app.post('/api/admin/upload-asset', async (c) => {
+  try {
+    if (!(await requireModerator(context.subredditName))) {
+      return c.json({ error: 'Moderator access required.' }, 403);
+    }
+
+    const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
+    const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
+    const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
+    const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+
+    if (!mediaType || !match) {
+      return c.json({ error: 'Invalid image data.' }, 400);
+    }
+
+    const base64 = match[2];
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    const byteLength = Math.floor((base64.length * 3) / 4) - padding;
+    if (byteLength > 2.5 * 1024 * 1024) {
+      return c.json({ error: 'Asset exceeds the 2.5 MB Asset Library upload limit.' }, 413);
+    }
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const uploaded = await media.upload({ url: dataUrl, type: mediaType });
+        if (uploaded.mediaUrl) {
+          return c.json({ url: uploaded.mediaUrl, type: mediaType });
+        }
+        lastError = new Error('Reddit did not return a media URL.');
+      } catch (error) {
+        lastError = error;
+        console.warn(`Asset media upload attempt ${attempt} failed`, error);
+      }
+
+      if (attempt < 3) await sleep(attempt * 2000);
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Reddit media upload failed.');
+  } catch (error) {
+    console.error('Failed to upload admin asset to Reddit Media API after retries', error);
+    const message = error instanceof Error ? error.message : 'Reddit could not finish the image upload.';
+    return c.json({ error: `Reddit media upload failed after 3 attempts: ${message}` }, 502);
+  }
+});
 
 app.post('/api/moderator/create-post', async (c) => {
   try {
