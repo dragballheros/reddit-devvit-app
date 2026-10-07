@@ -110,7 +110,245 @@ button { font: inherit; }
   overflow: hidden;
 }
 
-.menu__content::before {
+.menu__scene {
+  position: absolute;
+  inset: 10px;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+.menu__scene::before,
+.menu__scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.menu--waterfall {
+  background:
+    radial-gradient(circle at 52% 10%, rgba(160, 238, 255, 0.22), transparent 24%),
+    radial-gradient(circle at 18% 78%, rgba(65, 180, 255, 0.25), transparent 30%),
+    linear-gradient(180deg, #061622 0%, #083047 42%, #071925 100%);
+}
+
+.menu--ocean {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 245, 178, 0.22), transparent 22%),
+    radial-gradient(circle at 75% 55%, rgba(27, 208, 190, 0.25), transparent 35%),
+    linear-gradient(180deg, #051e30 0%, #036078 46%, #012c3d 100%);
+}
+
+.menu--space {
+  background:
+    radial-gradient(circle at 24% 30%, rgba(122, 72, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 76% 68%, rgba(34, 136, 255, 0.16), transparent 30%),
+    linear-gradient(150deg, #02030b 0%, #070b20 48%, #02030a 100%);
+}
+
+.menu__scene--petals::before {
+  background: radial-gradient(circle at 50% 35%, rgba(255, 93, 200, 0.05), transparent 45%);
+}
+
+.menu__scene--waterfall {
+  box-shadow: inset 0 0 80px rgba(94, 226, 255, 0.08);
+}
+.menu__scene--waterfall::before {
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgba(114, 223, 255, 0.07) 9% 11%, transparent 12% 28%, rgba(255,255,255,.045) 29% 30%, transparent 31% 100%),
+    radial-gradient(ellipse at 50% 100%, rgba(149, 241, 255, 0.28), transparent 48%);
+  filter: blur(4px);
+  animation: waterfall-light 8s ease-in-out infinite alternate;
+}
+.waterfall__moon {
+  position: absolute;
+  top: 9%;
+  right: 11%;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ffffff, #c4efff 42%, rgba(160,232,255,.4) 70%, transparent 71%);
+  box-shadow: 0 0 35px rgba(166,235,255,.34), 0 0 90px rgba(78,206,255,.18);
+  opacity: .82;
+}
+.waterfall__mist {
+  position: absolute;
+  left: 50%;
+  bottom: -7%;
+  width: 78%;
+  height: 42%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(226,251,255,.26), rgba(134,219,255,.11) 38%, transparent 72%);
+  filter: blur(14px);
+  animation: waterfall-mist 6s ease-in-out infinite alternate;
+}
+.waterfall__stream {
+  position: absolute;
+  top: -12%;
+  left: var(--waterfall-left);
+  width: clamp(3px, .22vw, 7px);
+  height: var(--waterfall-height);
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, rgba(204,249,255,.9) 20%, rgba(105,207,255,.52) 70%, transparent);
+  filter: blur(.2px);
+  opacity: .42;
+  animation: waterfall-flow var(--waterfall-duration) linear var(--waterfall-delay) infinite;
+}
+.waterfall__spark {
+  position: absolute;
+  left: var(--waterfall-left);
+  bottom: 18%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(233,253,255,.95);
+  box-shadow: 0 0 12px rgba(184,242,255,.9);
+  animation: waterfall-spark 3.6s ease-in-out var(--waterfall-delay) infinite;
+}
+
+.menu__scene--ocean {
+  box-shadow: inset 0 -70px 90px rgba(0, 24, 38, .38);
+}
+.menu__scene--ocean::before {
+  background:
+    linear-gradient(175deg, transparent 0 55%, rgba(255,255,255,.05) 56%, transparent 57%),
+    radial-gradient(ellipse at 50% 108%, rgba(0, 255, 221, .18), transparent 50%);
+}
+.ocean__sun-glow {
+  position: absolute;
+  top: 7%;
+  left: 50%;
+  width: 170px;
+  height: 170px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,247,181,.92) 0%, rgba(255,226,136,.32) 34%, transparent 70%);
+  filter: blur(2px);
+  animation: ocean-sun 7s ease-in-out infinite alternate;
+}
+.ocean__horizon {
+  position: absolute;
+  left: -5%;
+  right: -5%;
+  top: 25%;
+  height: 26%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), transparent 55%);
+  filter: blur(7px);
+}
+.ocean__wave {
+  position: absolute;
+  left: -12%;
+  width: 124%;
+  border-radius: 45% 55% 0 0;
+  filter: blur(.2px);
+  opacity: .78;
+}
+.ocean__wave--one {
+  bottom: -10%;
+  height: 48%;
+  background: linear-gradient(180deg, rgba(83,241,226,.22), rgba(1,80,101,.8));
+  animation: ocean-wave-one 9s ease-in-out infinite alternate;
+}
+.ocean__wave--two {
+  bottom: 5%;
+  height: 28%;
+  background: linear-gradient(180deg, rgba(255,255,255,.11), rgba(22,142,168,.28));
+  animation: ocean-wave-two 7s ease-in-out infinite alternate;
+}
+.ocean__wave--three {
+  bottom: 26%;
+  height: 16%;
+  background: linear-gradient(180deg, rgba(255,255,255,.13), rgba(69,212,210,.1));
+  animation: ocean-wave-three 5.5s ease-in-out infinite alternate;
+}
+.ocean__bubble {
+  position: absolute;
+  left: var(--ocean-left);
+  bottom: -20px;
+  width: var(--ocean-size);
+  height: var(--ocean-size);
+  border: 1px solid rgba(214,255,252,.42);
+  border-radius: 50%;
+  box-shadow: inset 0 0 4px rgba(255,255,255,.18), 0 0 9px rgba(133,242,239,.14);
+  animation: ocean-bubble var(--ocean-duration) ease-in var(--ocean-delay) infinite;
+}
+.ocean__shimmer {
+  position: absolute;
+  left: var(--ocean-left);
+  bottom: 28%;
+  width: 22%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+  filter: blur(.3px);
+  animation: ocean-shimmer 5s ease-in-out var(--ocean-delay) infinite;
+}
+
+.menu__scene--space {
+  box-shadow: inset 0 0 120px rgba(78,92,200,.08);
+}
+.space__nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: .52;
+}
+.space__nebula--one {
+  left: 8%;
+  top: 22%;
+  width: 45%;
+  height: 52%;
+  background: radial-gradient(circle, rgba(166,83,255,.38), rgba(60,78,210,.12) 42%, transparent 72%);
+  animation: space-nebula-one 13s ease-in-out infinite alternate;
+}
+.space__nebula--two {
+  right: 3%;
+  top: 8%;
+  width: 38%;
+  height: 44%;
+  background: radial-gradient(circle, rgba(39,170,255,.28), rgba(101,75,230,.10) 45%, transparent 70%);
+  animation: space-nebula-two 15s ease-in-out infinite alternate;
+}
+.space__nebula--three {
+  left: 30%;
+  bottom: -12%;
+  width: 50%;
+  height: 42%;
+  background: radial-gradient(circle, rgba(243,89,190,.20), rgba(72,54,180,.08) 45%, transparent 70%);
+  animation: space-nebula-three 17s ease-in-out infinite alternate;
+}
+.space__star {
+  position: absolute;
+  left: var(--space-left);
+  top: var(--space-top);
+  width: var(--space-size);
+  height: var(--space-size);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px rgba(255,255,255,.72);
+  opacity: .62;
+  animation: space-twinkle 3.8s ease-in-out var(--space-delay) infinite;
+}
+.space__shooting-star {
+  position: absolute;
+  left: var(--space-left);
+  top: var(--space-top);
+  width: 110px;
+  height: 2px;
+  border-radius: 999px;
+  transform: rotate(-28deg);
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(115,202,255,.5), transparent);
+  box-shadow: 0 0 10px rgba(146,222,255,.7);
+  opacity: 0;
+  animation: space-shooting 7s linear var(--space-delay) infinite;
+}
+
+
   content: "";
   position: absolute;
   inset: 7px;
