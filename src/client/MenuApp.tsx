@@ -5,7 +5,6 @@ import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState
 import {
   APP_CONFIG,
   getModmailLink,
-  getRenderableAssetUrl,
   getSubredditLabel,
   getSubredditTitle,
   normalizeSubredditName,
@@ -236,9 +235,9 @@ export const MenuApp = () => {
       .filter((button) => button.enabled !== false)
       .map((button) => ({
         label: button.label,
-        background: getRenderableAssetUrl(button.background),
+        background: button.background,
         backgroundGradient: button.backgroundGradient,
-        icon: getRenderableAssetUrl(button.icon),
+        icon: button.icon,
         accent: button.accent,
         labelFont: button.labelFont,
         labelSize: button.labelSize,
