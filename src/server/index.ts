@@ -188,81 +188,74 @@ app.post('/api/admin/save', async (c) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-app.post('/api/admin/upload-asset', async (c) => {
+const isAllowedCatboxUrl = (value: string): boolean => {
   try {
-    if (!(await requireModerator(context.subredditName))) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && ['catbox.moe', 'files.catbox.moe'].includes(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+};
+
+const fetchCatboxImage = async (initialUrl: string): Promise<Response> => {
+  let currentUrl = initialUrl;
+
+  for (let redirect = 0; redirect < 4; redirect += 1) {
+    const response = await fetch(currentUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: {
+        accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      },
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw new Error('Catbox returned a redirect without a location.');
+      const next = new URL(location, currentUrl).toString();
+      if (!isAllowedCatboxUrl(next)) throw new Error('Catbox redirected to an unapproved host.');
+      currentUrl = next;
+      continue;
     }
 
-    const payload = await c.req.json<{
-      dataUrl?: string;
-      sourceUrl?: string;
-      type?: 'image' | 'gif';
-    }>();
-    const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
-
-    if (!mediaType) {
-      return c.json({ error: 'Invalid media type.' }, 400);
+    if (!response.ok) {
+      throw new Error(`Catbox returned HTTP ${response.status}.`);
     }
 
-    let uploadUrl = '';
-    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl) {
-      try {
-        const parsed = new URL(payload.sourceUrl);
-        const host = parsed.hostname.toLowerCase();
-        if (parsed.protocol !== 'https:' || !['catbox.moe', 'files.catbox.moe'].includes(host)) {
-          return c.json({ error: 'Only direct HTTPS Catbox links are allowed.' }, 400);
-        }
-        uploadUrl = parsed.toString();
-      } catch {
-        return c.json({ error: 'Invalid Catbox URL.' }, 400);
-      }
-    } else {
-      const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
-      const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
-      if (!match) {
-        return c.json({ error: 'Invalid image data.' }, 400);
-      }
-
-      const base64 = match[2];
-      const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
-      const byteLength = Math.floor((base64.length * 3) / 4) - padding;
-      if (byteLength > 2.5 * 1024 * 1024) {
-        return c.json({ error: 'Local Asset Library uploads are limited to 2.5 MB by the Devvit Web request size.' }, 413);
-      }
-      uploadUrl = dataUrl;
+    const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
+    if (!contentType?.startsWith('image/')) {
+      throw new Error('The Catbox URL did not return an image. Use a direct image file URL.');
     }
 
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        const uploaded = await media.upload({ url: uploadUrl, type: mediaType });
-        if (uploaded.mediaUrl) {
-          return c.json({ url: uploaded.mediaUrl, type: mediaType });
-        }
-        lastError = new Error('Reddit did not return a media URL.');
-      } catch (error) {
-        lastError = error;
-        console.warn(`Asset media upload attempt ${attempt} failed`, error);
-      }
+    const headers = new Headers();
+    headers.set('Content-Type', contentType);
+    headers.set('Cache-Control', 'public, max-age=3600');
+    const length = response.headers.get('content-length');
+    if (length) headers.set('Content-Length', length);
+    return new Response(response.body, { status: 200, headers });
+  }
 
-      if (attempt < 3) await sleep(attempt * 2000);
+  throw new Error('Too many Catbox redirects.');
+};
+
+app.get('/api/catbox-asset', async (c) => {
+  try {
+    const sourceUrl = c.req.query('url')?.trim();
+    if (!sourceUrl || !isAllowedCatboxUrl(sourceUrl)) {
+      return c.json({ error: 'Only HTTPS Catbox image URLs are supported.' }, 400);
     }
 
-    const details = lastError instanceof Error ? lastError.message : 'unknown error';
-    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl) {
-      return c.json({
-        error: `Reddit could not import this Catbox asset. Reddit runtime media is limited to 20 MB, so a Catbox file over 20 MB cannot be stored as a Reddit-hosted app asset. Details: ${details}`,
-      }, 502);
-    }
-
-    throw lastError instanceof Error ? lastError : new Error('Reddit media upload failed.');
+    return await fetchCatboxImage(sourceUrl);
   } catch (error) {
-    console.error('Failed to upload admin asset to Reddit Media API after retries', error);
-    const message = error instanceof Error ? error.message : 'Reddit could not finish the image upload.';
-    return c.json({ error: `Reddit media upload failed after 3 attempts: ${message}` }, 502);
+    console.error('Failed to proxy Catbox asset', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Unable to load Catbox asset.' },
+      502,
+    );
   }
 });
+
+
 app.post('/api/moderator/create-post', async (c) => {
   try {
     const subredditName = context.subredditName;
