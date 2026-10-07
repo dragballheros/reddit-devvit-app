@@ -23,6 +23,61 @@ const encodeConfig = (config: AdminConfig): string =>
 const decodeConfig = (value: string): AdminConfig =>
   JSON.parse(inflateSync(Buffer.from(value, 'base64')).toString('utf8')) as AdminConfig;
 
+const PUBLIC_IMAGE_ERROR = 'This image cannot be used.';
+const MODERATION_UNAVAILABLE_ERROR = 'This image could not be verified, so it cannot be used.';
+
+type ModerationResponse = {
+  results?: Array<{
+    flagged?: boolean;
+    categories?: Record<string, boolean>;
+  }>;
+};
+
+const moderateImage = async (imageUrl: string): Promise<'approved' | 'blocked'> => {
+  const apiKeyValue = await context.settings.get('OPENAI_API_KEY');
+  const apiKey = typeof apiKeyValue === 'string' ? apiKeyValue.trim() : '';
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
+
+  const response = await fetch('https://api.openai.com/v1/moderations', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'omni-moderation-latest',
+      input: [
+        {
+          type: 'image_url',
+          image_url: { url: imageUrl },
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI moderation HTTP ${response.status}.`);
+  }
+
+  const payload = await response.json() as ModerationResponse;
+  const result = payload.results?.[0];
+  if (!result || !result.categories) {
+    throw new Error('OpenAI moderation returned no classification result.');
+  }
+
+  const sexuallyExplicit = Boolean(
+    result.categories.sexual || result.categories['sexual/minors'],
+  );
+  const highRisk = Boolean(result.categories['violence/graphic']);
+
+  return result.flagged || sexuallyExplicit || highRisk ? 'blocked' : 'approved';
+};
+
+const requireImageModeration = async (imageUrl: string): Promise<void> => {
+  const result = await moderateImage(imageUrl);
+  if (result === 'blocked') throw new Error(PUBLIC_IMAGE_ERROR);
+};
+
 const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | undefined> => {
   const redditPostId = toRedditPostId(postId);
   if (!redditPostId) return undefined;
@@ -238,23 +293,78 @@ const fetchCatboxImage = async (initialUrl: string): Promise<Response> => {
   throw new Error('Too many Catbox redirects.');
 };
 
-app.get('/api/catbox-asset', async (c) => {
+app.post('/api/admin/upload-asset', async (c) => {
   try {
-    const sourceUrl = c.req.query('url')?.trim();
-    if (!sourceUrl || !isAllowedCatboxUrl(sourceUrl)) {
-      return c.json({ error: 'Only HTTPS Catbox image URLs are supported.' }, 400);
+    if (!(await requireModerator(context.subredditName))) {
+      return c.json({ error: 'Moderator access required.' }, 403);
     }
 
-    return await fetchCatboxImage(sourceUrl);
+    const payload = await c.req.json<{
+      dataUrl?: string;
+      sourceUrl?: string;
+      type?: 'image' | 'gif';
+    }>();
+    const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
+    if (!mediaType) return c.json({ error: 'Invalid media type.' }, 400);
+
+    let sourceForModeration = '';
+    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl.trim()) {
+      const sourceUrl = payload.sourceUrl.trim();
+      if (!isAllowedCatboxUrl(sourceUrl)) {
+        return c.json({ error: 'Only direct HTTPS Catbox links are allowed.' }, 400);
+      }
+      sourceForModeration = sourceUrl;
+    } else {
+      const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
+      const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) return c.json({ error: 'Invalid image data.' }, 400);
+
+      const base64 = match[2];
+      const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+      const byteLength = Math.floor((base64.length * 3) / 4) - padding;
+      if (byteLength > 2.5 * 1024 * 1024) {
+        return c.json({ error: 'Local uploads are limited to 2.5 MB by the Devvit Web request size.' }, 413);
+      }
+      sourceForModeration = dataUrl;
+    }
+
+    try {
+      await requireImageModeration(sourceForModeration);
+    } catch (error) {
+      console.warn('Admin media blocked or could not be moderated', error);
+      return c.json({
+        error: error instanceof Error && error.message === PUBLIC_IMAGE_ERROR
+          ? PUBLIC_IMAGE_ERROR
+          : MODERATION_UNAVAILABLE_ERROR,
+      }, 422);
+    }
+
+    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl.trim()) {
+      return c.json({ url: payload.sourceUrl.trim(), type: mediaType, hosting: 'catbox' });
+    }
+
+    const dataUrl = payload.dataUrl!.trim();
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const uploaded = await media.upload({ url: dataUrl, type: mediaType });
+        if (uploaded.mediaUrl) {
+          return c.json({ url: uploaded.mediaUrl, type: mediaType, hosting: 'reddit' });
+        }
+        lastError = new Error('Reddit did not return a media URL.');
+      } catch (error) {
+        lastError = error;
+        console.warn(`Asset media upload attempt ${attempt} failed`, error);
+      }
+      if (attempt < 3) await sleep(attempt * 2000);
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Reddit media upload failed.');
   } catch (error) {
-    console.error('Failed to proxy Catbox asset', error);
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Unable to load Catbox asset.' },
-      502,
-    );
+    console.error('Failed to upload admin asset after moderation', error);
+    return c.json({ error: error instanceof Error ? error.message : MODERATION_UNAVAILABLE_ERROR }, 502);
   }
 });
-
 
 app.post('/api/moderator/create-post', async (c) => {
   try {
