@@ -47,7 +47,7 @@ The admin panel can also create and update managed navigation posts in selected 
 
 ## Moderator admin panel
 
-The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the configuration post and pins it to the app account's profile pin slot.
+The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the configuration post. Open that post and use Reddit's native **Pin Post To Profile** action to place it on the app account's profile.
 
 ## Development
 
