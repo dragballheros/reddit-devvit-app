@@ -192,13 +192,17 @@ app.post('/api/admin/upload-asset', async (c) => {
     }
 
     const payload = await c.req.json<{ url?: string; type?: 'image' | 'gif' }>();
-    if (!payload.url || !['image', 'gif'].includes(payload.type ?? '')) {
+    const mediaType = payload.type === 'gif' || payload.type === 'image'
+      ? payload.type
+      : undefined;
+
+    if (!payload.url || !mediaType) {
       return c.json({ error: 'Invalid media.' }, 400);
     }
 
     const uploaded = await media.upload({
       url: payload.url,
-      type: payload.type,
+      type: mediaType,
     });
 
     if (!uploaded.mediaUrl) {
