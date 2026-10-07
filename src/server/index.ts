@@ -9,6 +9,8 @@ const app = new Hono();
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const APP_PROFILE_SUBREDDIT = 'u_animeh34pro';
+
 const pinPostToAppProfile = async (postId: RedditPostId): Promise<void> => {
   const delays = [0, 1000, 2500, 5000];
   let lastError: unknown;
@@ -18,6 +20,7 @@ const pinPostToAppProfile = async (postId: RedditPostId): Promise<void> => {
 
     try {
       const post = await reddit.getPostById(postId);
+      console.log('Pinning admin post ' + postId + ' authored by ' + post.authorName + ' in ' + post.subredditName);
       await post.sticky(3);
       console.log('Pinned admin post ' + postId + ' to the app profile.');
       return;
@@ -28,6 +31,22 @@ const pinPostToAppProfile = async (postId: RedditPostId): Promise<void> => {
   }
 
   throw lastError instanceof Error ? lastError : new Error('Failed to pin admin post to the app profile.');
+};
+
+const createAdminProfilePost = async (sourceSubreddit: string): Promise<RedditPostId> => {
+  const config = getDefaultAdminConfig();
+  const post = await reddit.submitCustomPost({
+    subredditName: APP_PROFILE_SUBREDDIT,
+    title: '\u200B',
+    entry: 'admin',
+    postData: {
+      portalAdmin: true,
+      portalAdminSourceSubreddit: sourceSubreddit,
+      portalConfig: encodeConfig(config),
+      updatedAt: Date.now(),
+    },
+  });
+  return post.id;
 };
 
 const ADMIN_POST_KEY = 'community-portal:admin-post';
@@ -85,6 +104,14 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
       }
     : APP_CONFIG;
 
+const getAdminSourceSubreddit = async (): Promise<string | undefined> => {
+  if (!context.postId) return undefined;
+  const data = await reddit.getPostData(context.postId);
+  return typeof data?.portalAdminSourceSubreddit === 'string'
+    ? data.portalAdminSourceSubreddit
+    : undefined;
+};
+
 const requireModerator = async (subredditName?: string) =>
   Boolean(subredditName && await isCurrentUserModerator(subredditName));
 
@@ -117,7 +144,11 @@ app.get('/api/runtime-config', async (c) => {
 
 app.get('/api/admin/config', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName)) || !context.postId) {
+    if (!context.postId) {
+      return c.json({ error: 'Admin post context is missing.' }, 400);
+    }
+    const sourceSubreddit = await getAdminSourceSubreddit();
+    if (!(await requireModerator(sourceSubreddit ?? context.subredditName))) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
     const config = await getAdminConfigFromPost(context.postId) ?? getDefaultAdminConfig();
@@ -146,7 +177,11 @@ app.get('/api/moderator-status', async (c) => {
 
 app.post('/api/admin/save', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName)) || !context.postId) {
+    if (!context.postId) {
+      return c.json({ error: 'Admin post context is missing.' }, 400);
+    }
+    const sourceSubreddit = await getAdminSourceSubreddit();
+    if (!(await requireModerator(sourceSubreddit ?? context.subredditName))) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ config: AdminConfig }>();
@@ -262,27 +297,29 @@ app.post('/internal/menu/create-admin', async (c) => {
     if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
       return c.json<UiResponse>({ showToast: 'Moderator access is required.' });
     }
+
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
-      await pinPostToAppProfile(existing as RedditPostId);
-      return c.json<UiResponse>({ showToast: 'Admin panel is pinned to the app profile.' });
+      try {
+        const existingPost = await reddit.getPostById(existing as RedditPostId);
+        if (existingPost.subredditName === APP_PROFILE_SUBREDDIT) {
+          await pinPostToAppProfile(existing as RedditPostId);
+          return c.json<UiResponse>({ showToast: 'Admin panel is pinned to the app profile.' });
+        }
+      } catch (error) {
+        console.warn('Existing admin profile post could not be reused; creating a new one.', error);
+      }
     }
-    const config = getDefaultAdminConfig();
-    const post = await reddit.submitCustomPost({
-      subredditName,
-      title: '\u200B',
-      entry: 'admin',
-      postData: { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() },
-    });
-    await redis.set(ADMIN_POST_KEY, post.id);
-    await pinPostToAppProfile(post.id);
+
+    const postId = await createAdminProfilePost(subredditName);
+    await redis.set(ADMIN_POST_KEY, postId);
+    await pinPostToAppProfile(postId);
     return c.json<UiResponse>({ showToast: 'Admin panel created and pinned to the app profile.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
-    return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
+    return c.json<UiResponse>({ showToast: 'Failed to create and pin the admin configuration panel.' });
   }
 });
-
 app.post('/internal/menu/create-post', async (c) => {
   try {
     const _input = await c.req.json<MenuItemRequest>().catch(() => ({}));
