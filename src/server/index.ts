@@ -163,6 +163,7 @@ app.post('/api/admin/save', async (c) => {
             subredditName,
             title: '\u200B',
             entry: 'default',
+            nsfw: true,
             postData: { portalAdminPostId: adminPostId },
           });
           bySub.set(subredditName.toLowerCase(), { subredditName, postId: post.id });
@@ -245,6 +246,7 @@ app.post('/api/moderator/create-post', async (c) => {
       subredditName,
       title: '\u200B',
       entry: 'default',
+      nsfw: true,
     });
 
     return c.json({
@@ -294,6 +296,7 @@ app.post('/internal/menu/create-admin', async (c) => {
       subredditName,
       title: '\u200B',
       entry: 'admin',
+      nsfw: true,
       postData: { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() },
     });
 
