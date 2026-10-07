@@ -240,7 +240,11 @@ app.post('/internal/menu/create-admin', async (c) => {
       return c.json<UiResponse>({ showToast: 'Moderator access is required.' });
     }
     const existing = await redis.get(ADMIN_POST_KEY);
-    if (existing) return c.json<UiResponse>({ showToast: 'Admin panel already exists. Open or pin that post from your profile.' });
+    if (existing) {
+      const existingPost = await reddit.getPostById(existing as RedditPostId);
+      await existingPost.sticky(3);
+      return c.json<UiResponse>({ showToast: 'Admin panel is pinned to the app profile.' });
+    }
     const config = getDefaultAdminConfig();
     const post = await reddit.submitCustomPost({
       subredditName,
