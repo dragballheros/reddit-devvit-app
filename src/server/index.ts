@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis } from '@devvit/web/server';
+import { getDevvitConfig } from '@devvit/shared-types/server/get-devvit-config.js';
+import { LinksAndCommentsDefinition } from '@devvit/protos/types/devvit/plugin/redditapi/linksandcomments/linksandcomments_svc.js';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { APP_CONFIG, getDefaultAdminConfig, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
@@ -12,13 +14,21 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const pinPostToAppProfile = async (postId: RedditPostId): Promise<void> => {
   const delays = [0, 1000, 2500, 5000];
   let lastError: unknown;
+  const linksAndComments = getDevvitConfig().use(LinksAndCommentsDefinition);
 
   for (const delay of delays) {
     if (delay > 0) await sleep(delay);
 
     try {
-      const post = await reddit.getPostById(postId);
-      await post.sticky(3);
+      await linksAndComments.SetSubredditSticky(
+        {
+          id: postId,
+          state: true,
+          num: 3,
+          toProfile: true,
+        } as never,
+        context.metadata
+      );
       console.log('Pinned admin post ' + postId + ' to the app profile.');
       return;
     } catch (error) {
