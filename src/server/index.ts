@@ -81,12 +81,12 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
 
 app.get('/api/runtime-config', async (c) => {
   try {
-    const explicitAdminPostId = typeof context.postData?.portalAdminPostId === 'string'
-      ? toRedditPostId(context.postData.portalAdminPostId)
-      : toRedditPostId(context.postData?.portalAdmin === true ? context.postId : undefined);
-    const fallbackAdminPostId = explicitAdminPostId ?? toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
-    const adminConfig = await getAdminConfigFromPost(fallbackAdminPostId);
-    return c.json({ config: effectiveConfig(adminConfig), adminPostId: fallbackAdminPostId ?? null });
+    const isAdminPanel = context.postData?.portalAdmin === true;
+    const adminPostId = isAdminPanel
+      ? toRedditPostId(context.postId)
+      : toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
+    const adminConfig = await getAdminConfigFromPost(adminPostId);
+    return c.json({ config: effectiveConfig(adminConfig), adminPostId: adminPostId ?? null });
   } catch (error) {
     console.error('Failed to load runtime community navigation config', error);
     return c.json({ config: APP_CONFIG, adminPostId: null });
@@ -156,9 +156,22 @@ app.post('/api/admin/save', async (c) => {
         }
         const current = bySub.get(subredditName.toLowerCase());
         if (current) {
-          const post = await reddit.getPostById(current.postId);
-          await post.setPostData({ portalAdminPostId: adminPostId });
-          results.push({ subredditName, status: 'updated', postId: current.postId });
+          try {
+            const post = await reddit.getPostById(current.postId);
+            await post.setPostData({ portalAdminPostId: adminPostId });
+            results.push({ subredditName, status: 'updated', postId: current.postId });
+          } catch (error) {
+            console.warn('Managed navigation post is stale; recreating it.', current.postId, error);
+            const post = await reddit.submitCustomPost({
+              subredditName,
+              title: '\u200B',
+              entry: 'default',
+              nsfw: true,
+              postData: { portalAdminPostId: adminPostId },
+            });
+            bySub.set(subredditName.toLowerCase(), { subredditName, postId: post.id });
+            results.push({ subredditName, status: 'created', postId: post.id });
+          }
         } else {
           const post = await reddit.submitCustomPost({
             subredditName,
