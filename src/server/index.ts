@@ -230,7 +230,8 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
       mimeType?: string;
       data?: string;
     }>();
-    if (!isUploadId(payload.uploadId) || !Number.isInteger(payload.index) || !Number.isInteger(payload.totalChunks) || !Number.isInteger(payload.totalBytes) || !payload.data) {
+    const uploadId = payload.uploadId;
+    if (!isUploadId(uploadId) || !Number.isInteger(payload.index) || !Number.isInteger(payload.totalChunks) || !Number.isInteger(payload.totalBytes) || !payload.data) {
       return c.json({ error: 'Invalid upload chunk.' }, 400);
     }
 
@@ -257,7 +258,7 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
       return c.json({ error: 'Upload chunk is too large.' }, 413);
     }
 
-    const key = getAssetUploadKey(payload.uploadId!);
+    const key = getAssetUploadKey(uploadId);
     const existingMeta = await redis.hGet(key, '_meta');
     const meta = JSON.stringify({ totalChunks, totalBytes, type: mediaType, mimeType });
     if (existingMeta && existingMeta !== meta) {
