@@ -210,6 +210,7 @@ export const MenuApp = () => {
     () => pickRandomItem(configuredWelcomeGifs, ''),
     [configuredWelcomeGifs],
   );
+  const sessionGifFit = config.welcomeGifFitByUrl?.[sessionGifSrc] ?? 'natural';
 
   const subredditTitle = getSubredditTitle(context.subredditName);
   const subredditLabel = getSubredditLabel(context.subredditName);
@@ -303,7 +304,17 @@ export const MenuApp = () => {
             decoding="sync"
             fetchPriority="high"
             onError={() => setIsIntroHidden(true)}
-            style={{ objectFit: config.introGifFit }}
+            style={{
+              objectFit: config.introGifFit,
+              ...(sessionGifFit === 'canvas'
+                ? {
+                    width: '100%',
+                    height: '100%',
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                  }
+                : {}),
+            }}
           />
           <div className="intro__title" aria-label={subredditTitle}>
             {Array.from(subredditTitle).map((char, index) => (
