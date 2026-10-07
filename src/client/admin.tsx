@@ -83,9 +83,27 @@ export const AdminApp = () => {
 
       if (!result || result.action === 'CANCELED' || !result.values?.media) return;
 
-      const url = String(result.values.media);
-      if (!/^https?:\/\/[^\s]+$/i.test(url)) {
+      const sourceUrl = String(result.values.media);
+      if (!/^https?:\/\/[^\s]+$/i.test(sourceUrl)) {
         showToast('Reddit did not return a usable image URL.');
+        return;
+      }
+
+      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>(
+        '/api/admin/upload-asset',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            url: sourceUrl,
+            type: kind === 'welcome' ? 'gif' : 'image',
+          }),
+        },
+      );
+
+      const url = uploaded.url;
+      if (!/^https?:\/\/[^\s]+$/i.test(url)) {
+        showToast('Reddit did not return a usable hosted asset URL.');
         return;
       }
 
@@ -93,7 +111,7 @@ export const AdminApp = () => {
         id: `asset-${Date.now()}`,
         name: String(result.values.name ?? 'Uploaded asset'),
         url,
-        type: kind === 'welcome' ? 'gif' : 'image',
+        type: uploaded.type,
       };
 
       setConfig((current) => ({
