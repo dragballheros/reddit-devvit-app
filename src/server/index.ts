@@ -328,6 +328,7 @@ app.post('/internal/menu/create-post', async (c) => {
       subredditName,
       title: '\u200B',
       entry: 'default',
+      nsfw: true,
     });
 
     console.log('Created community navigation custom post ' + post.id + ' in r/' + subredditName);
