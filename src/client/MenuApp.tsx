@@ -73,12 +73,16 @@ const getMobileSnapshot = () => {
   const uaMobile = (window.navigator as Navigator & { userAgentData?: { mobile?: boolean } })
     ?.userAgentData?.mobile;
 
+  const coarsePointer = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false;
+
   return (
     /Android|iPhone|iPad|iPod|IEMobile|Windows Phone|webOS|BlackBerry/i.test(ua) ||
     /Reddit|RedditAndroid|RedditiOS/i.test(ua) ||
     Boolean(uaMobile) ||
     window.innerWidth <= 600 ||
-    window.matchMedia?.('(pointer: coarse)').matches === true ||
+    coarsePointer ||
     context.client?.name === 'ANDROID' ||
     context.client?.name === 'IOS'
   );
@@ -90,8 +94,12 @@ const useIsMobile = () => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const media = window.matchMedia?.('(max-width: 600px)');
-    const coarse = window.matchMedia?.('(pointer: coarse)');
+    const media = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 600px)')
+      : null;
+    const coarse = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)')
+      : null;
 
     const update = () => setIsMobile(getMobileSnapshot());
 
