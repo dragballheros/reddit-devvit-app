@@ -185,7 +185,7 @@ export const MenuApp = () => {
   }, [hasWelcomeGif, isMobile]);
 
   const portals = useMemo(() => {
-    return (config.buttons ?? [])
+    const configuredButtons = (config.buttons ?? [])
       .filter((button) => button.enabled !== false)
       .map((button) => ({
         label: button.label,
@@ -205,6 +205,19 @@ export const MenuApp = () => {
           else if (button.url) navigateTo(button.url);
         },
       }));
+
+    if (configuredButtons.length > 0) return configuredButtons;
+
+    return [
+      { label: 'Subreddit 1', accent: '#b18cff', backgroundGradient: 'linear-gradient(120deg, #1b1b2f, #3d2c63, #090a12)' },
+      { label: 'Subreddit 2', accent: '#6ecbff', backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)' },
+      { label: 'Subreddit 3', accent: '#ff8fcf', backgroundGradient: 'linear-gradient(120deg, #35162f, #6b315b, #120914)' },
+      { label: 'Subreddit 4', accent: '#8ff0c8', backgroundGradient: 'linear-gradient(120deg, #102f2b, #1d5c50, #071513)' },
+    ].map((button) => ({
+      ...button,
+      onClick: () => {},
+      disabled: true,
+    }));
   }, [config.buttons]);
 
   return (
