@@ -60,8 +60,8 @@ export const AdminApp = () => {
   }));
 
   const uploadMedia = async (kind: 'welcome'|'background'|'icon', buttonId?: string) => {
-    const result = await showForm({ form: { title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon', fields: [{ type: 'string', name: 'name', label: 'Asset name', required: true }, { type: 'image', name: 'media', label: 'Image or GIF', required: true, helpText: 'Reddit-hosted uploads are limited to 20 MB.' }] } });
-    if (!result?.media) return;
+    const result = await showForm({ title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon', fields: [{ type: 'string', name: 'name', label: 'Asset name', required: true }, { type: 'image', name: 'media', label: 'Image or GIF', required: true, helpText: 'Reddit-hosted uploads are limited to 20 MB.' }] });
+    if (!result || result.action === 'CANCELED' || !result.media) return;
     const url = result.media as string;
     const asset: ManagedAsset = { id: `asset-${Date.now()}`, name: String(result.name ?? 'Uploaded asset'), url, type: kind === 'welcome' ? 'gif' : 'image' };
     setConfig((current) => ({
