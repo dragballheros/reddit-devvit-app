@@ -89,17 +89,6 @@ export const APP_CONFIG: AppConfig = {
     createPost: {},
   },
 };
-export const isCatboxAssetUrl = (value?: string | null): boolean =>
-  /^https:\/\/(?:files\.)?catbox\.moe\//i.test((value ?? '').trim());
-
-export const getRenderableAssetUrl = (value?: string | null): string | undefined => {
-  const url = value?.trim();
-  if (!url) return undefined;
-  return isCatboxAssetUrl(url)
-    ? `/api/catbox-asset?url=${encodeURIComponent(url)}`
-    : url;
-};
-
 export const normalizeSubredditName = (subredditName?: string | null): string =>
   (subredditName ?? '').trim().replace(/^r\//i, '').toLowerCase();
 
