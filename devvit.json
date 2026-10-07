@@ -53,12 +53,23 @@
       "enable": true,
       "domains": [
         "catbox.moe",
-        "files.catbox.moe"
+        "files.catbox.moe",
+        "api.openai.com"
       ]
     }
   },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build"
+  },
+  "settings": {
+    "global": {
+      "OPENAI_API_KEY": {
+        "type": "string",
+        "label": "OpenAI moderation API key",
+        "helpText": "Server-only key used to screen uploaded and Catbox button media before it can be displayed.",
+        "isSecret": true
+      }
+    }
   }
 }
