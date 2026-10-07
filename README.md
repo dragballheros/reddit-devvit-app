@@ -1,39 +1,63 @@
-# HentaiApp
+# Community Portal for Reddit
 
-HentaiApp is a community navigation experience for Reddit. It gives a subreddit a branded custom post that acts as a simple home screen for the community's most useful destinations.
+A reusable Reddit Devvit custom post that gives moderators a configurable community navigation page.
 
-## Purpose
+## What it provides
 
-HentaiApp is designed for communities that want one easy-to-use place where members can find related subreddits, community resources, and moderator communication links.
+- A moderator-only admin panel for configuring the portal.
+- Custom buttons with labels, destinations, icons, backgrounds, gradients, colors, and layout controls.
+- Optional welcome GIFs, including multiple GIFs selected randomly on each post load or refresh.
+- If no welcome GIF is configured, the portal opens directly to the button section.
+- A moderator menu action for creating a portal post for review or testing.
+- A second moderator menu action for creating the configuration/admin post.
+- A managed subreddit list that lets moderators apply the same configuration to multiple communities where the app is installed.
+- A minimal default configuration with no community-specific links or bundled artwork.
 
-The experience is focused on navigation. It does not replace the destination communities or provide a separate content feed.
+## Configuration model
 
-## How it works
+The repository intentionally contains no community-specific destination links, icons, banners, or welcome media.
 
-When a HentaiApp custom post is opened, users see a short welcome animation followed by the community menu.
+Each community supplies its own configuration through the admin panel. This keeps the project reusable instead of tying the code to a particular subreddit, brand, Discord server, social account, or artwork collection.
 
-The menu provides large, clearly labeled buttons that users can select to open the configured destination. The experience is designed to work on both desktop and mobile Reddit clients.
+### Welcome media
 
-The menu uses community-specific artwork and visual styling while keeping the labels consistent and easy to read. Image-based destinations preserve their artwork without stretching, while destinations without artwork use animated visual backgrounds.
+Welcome GIFs are optional.
 
-## Moderator functionality
+- Add one GIF to show a single welcome animation.
+- Add multiple GIFs to randomly select one whenever the post loads or refreshes.
+- Remove all GIFs to skip the welcome screen and show the configured buttons immediately.
 
-Subreddit moderators have a **Create HentaiApp Post** action in the subreddit menu.
+### Portal buttons
 
-This lets moderators quickly create a new HentaiApp custom post for the community. The action is intended for setting up or refreshing the community's HentaiApp entry point.
+Moderators can create and customize buttons for:
 
-## User experience
+- Subreddits
+- Discord servers
+- Modmail
+- Custom external links
 
-HentaiApp is designed to be:
+Buttons can optionally use uploaded Reddit-hosted media or CSS gradients. A button without an image uses its configured gradient.
 
-- Easy to understand without instructions
-- Fast to navigate
-- Comfortable to use on mobile screens
-- Clearly separated into individual destination buttons
-- Visually branded while keeping navigation straightforward
+## Review and testing
 
-The button list can be scrolled vertically on smaller screens, allowing the complete set of destinations to remain accessible without requiring the entire page to be compressed into one view.
+The moderator **Create Portal Post** action creates an independent custom post so the portal can be reviewed or tested without changing the administrator configuration.
 
-## Intended audience
+The admin panel can also create and update managed portal posts in selected subreddits. Moderation permissions and app installation are required in each target subreddit.
 
-HentaiApp is intended for Reddit communities and their moderators who want a dedicated, visually organized navigation page for community destinations and resources.
+## Development
+
+Install dependencies and run the type check and build:
+
+```bash
+npm install
+npm run type-check
+npm run build
+```
+
+For Devvit runtime testing:
+
+```bash
+npm run dev
+```
+
+The project is intended to be configured per community rather than shipped with a preconfigured set of destinations or media.
