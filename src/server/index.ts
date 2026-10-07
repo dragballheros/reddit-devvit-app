@@ -231,7 +231,7 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
       data?: string;
     }>();
     const uploadId = payload.uploadId;
-    if (!isUploadId(uploadId) || !Number.isInteger(payload.index) || !Number.isInteger(payload.totalChunks) || !Number.isInteger(payload.totalBytes) || !payload.data) {
+    if (typeof uploadId !== 'string' || !isUploadId(uploadId) || !Number.isInteger(payload.index) || !Number.isInteger(payload.totalChunks) || !Number.isInteger(payload.totalBytes) || !payload.data) {
       return c.json({ error: 'Invalid upload chunk.' }, 400);
     }
 
@@ -285,9 +285,12 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
     }
 
     const payload = await c.req.json<{ uploadId?: string }>();
-    if (!isUploadId(payload.uploadId)) return c.json({ error: 'Invalid upload session.' }, 400);
+    const uploadId = payload.uploadId;
+    if (typeof uploadId !== 'string' || !isUploadId(uploadId)) {
+      return c.json({ error: 'Invalid upload session.' }, 400);
+    }
 
-    const key = getAssetUploadKey(payload.uploadId);
+    const key = getAssetUploadKey(uploadId);
     const rawMeta = await redis.hGet(key, '_meta');
     if (!rawMeta) return c.json({ error: 'Upload session expired. Please upload the asset again.' }, 410);
 
