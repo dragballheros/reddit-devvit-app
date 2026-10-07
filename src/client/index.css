@@ -895,6 +895,74 @@ button { font: inherit; }
   opacity: 0.32;
 }
 
+@keyframes waterfall-light {
+  from { transform: translateX(-4%) scale(1); opacity: .55; }
+  to { transform: translateX(4%) scale(1.05); opacity: .9; }
+}
+@keyframes waterfall-flow {
+  0% { transform: translateY(-5%) scaleY(.78); opacity: 0; }
+  15% { opacity: .5; }
+  55% { opacity: .78; }
+  100% { transform: translateY(72%) scaleY(1.08); opacity: 0; }
+}
+@keyframes waterfall-mist {
+  from { transform: translateX(-50%) translateY(2%) scale(.92); opacity: .42; }
+  to { transform: translateX(-50%) translateY(-3%) scale(1.06); opacity: .78; }
+}
+@keyframes waterfall-spark {
+  0%, 100% { transform: translateY(0) scale(.7); opacity: .08; }
+  45% { transform: translateY(-28px) scale(1.2); opacity: .9; }
+  72% { transform: translateY(-48px) scale(.8); opacity: .2; }
+}
+@keyframes ocean-sun {
+  from { transform: translateX(-50%) scale(.96); opacity: .72; }
+  to { transform: translateX(-50%) scale(1.05); opacity: 1; }
+}
+@keyframes ocean-wave-one {
+  from { transform: translateX(-2%) rotate(-1.2deg) scale(1); }
+  to { transform: translateX(2%) rotate(1.3deg) scale(1.04); }
+}
+@keyframes ocean-wave-two {
+  from { transform: translateX(3%) rotate(1.2deg) scale(1.02); }
+  to { transform: translateX(-3%) rotate(-1deg) scale(1.07); }
+}
+@keyframes ocean-wave-three {
+  from { transform: translateX(-4%) scaleX(1.01); }
+  to { transform: translateX(4%) scaleX(1.08); }
+}
+@keyframes ocean-bubble {
+  0% { transform: translate3d(0,0,0) scale(.6); opacity: 0; }
+  12% { opacity: .42; }
+  70% { opacity: .2; }
+  100% { transform: translate3d(18px,-76vh,0) scale(1.18); opacity: 0; }
+}
+@keyframes ocean-shimmer {
+  0%, 100% { transform: translateX(-18px) scaleX(.65); opacity: .08; }
+  50% { transform: translateX(35px) scaleX(1.25); opacity: .7; }
+}
+@keyframes space-nebula-one {
+  from { transform: translate3d(-3%,2%,0) scale(.94) rotate(-2deg); }
+  to { transform: translate3d(6%,-3%,0) scale(1.08) rotate(3deg); }
+}
+@keyframes space-nebula-two {
+  from { transform: translate3d(4%,-2%,0) scale(1); }
+  to { transform: translate3d(-5%,5%,0) scale(1.12); }
+}
+@keyframes space-nebula-three {
+  from { transform: translate3d(-3%,4%,0) scale(.98); }
+  to { transform: translate3d(4%,-5%,0) scale(1.08); }
+}
+@keyframes space-twinkle {
+  0%, 100% { transform: scale(.7); opacity: .22; }
+  50% { transform: scale(1.35); opacity: .95; }
+}
+@keyframes space-shooting {
+  0%, 72% { transform: translate3d(-90px,-55px,0) rotate(-28deg) scaleX(.55); opacity: 0; }
+  75% { opacity: .9; }
+  83% { transform: translate3d(155px,95px,0) rotate(-28deg) scaleX(1.05); opacity: .35; }
+  88%, 100% { transform: translate3d(245px,150px,0) rotate(-28deg) scaleX(.3); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu__petal { animation: none !important; opacity: 0 !important; }
 
