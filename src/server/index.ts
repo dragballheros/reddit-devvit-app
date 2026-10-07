@@ -87,7 +87,7 @@ app.get('/api/runtime-config', async (c) => {
     const adminConfig = await getAdminConfigFromPost(adminPostId);
     return c.json({ config: effectiveConfig(adminConfig), adminPostId: adminPostId ?? null });
   } catch (error) {
-    console.error('Failed to load runtime portal config', error);
+    console.error('Failed to load runtime community navigation config', error);
     return c.json({ config: APP_CONFIG, adminPostId: null });
   }
 });
@@ -213,7 +213,7 @@ app.post('/api/moderator/create-post', async (c) => {
       permalink: post.permalink,
     });
   } catch (error) {
-    console.error('Failed to create moderator portal post', error);
+    console.error('Failed to create moderator navigation post', error);
     return c.json(
       { error: 'Failed to create the custom post. Check the app account permissions.' },
       500
@@ -254,7 +254,7 @@ app.post('/internal/menu/create-admin', async (c) => {
     return c.json<UiResponse>({ showToast: 'Admin panel created. Pin the post to your profile if desired.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
-    return c.json<UiResponse>({ showToast: 'Failed to create the admin panel.' });
+    return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
   }
 });
 
@@ -279,7 +279,7 @@ app.post('/internal/menu/create-post', async (c) => {
       entry: 'default',
     });
 
-    console.log('Created Portal custom post ' + post.id + ' in r/' + subredditName);
+    console.log('Created community navigation custom post ' + post.id + ' in r/' + subredditName);
 
     /*
      * submitCustomPost() returns Reddit's relative permalink. The Devvit
