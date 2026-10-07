@@ -22,14 +22,14 @@
   "menu": {
     "items": [
       {
-        "label": "Create HentaiApp Post",
-        "description": "Create a new HentaiApp custom post for testing and review.",
+        "label": "Create Portal Post",
+        "description": "Create a new portal custom post for testing and review.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-post"
       },
       {
-        "label": "Create HentaiApp Admin Panel",
+        "label": "Create Portal Admin Panel",
         "description": "Create the moderator configuration panel. Pin the resulting post to your profile if desired.",
         "location": "subreddit",
         "forUserType": "moderator",
