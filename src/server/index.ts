@@ -22,7 +22,9 @@ const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | un
   if (!postId) return undefined;
   const data = await reddit.getPostData(postId);
   const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
-  return encoded ? decodeConfig(encoded) : undefined;
+  if (!encoded) return undefined;
+  const config = decodeConfig(encoded);
+  return { ...config, assets: config.assets ?? [] };
 };
 
 const getTargetPosts = async (): Promise<TargetPostRecord[]> => {
