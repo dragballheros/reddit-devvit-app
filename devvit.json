@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "community-portal",
+  "name": "animeh34pro",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
@@ -22,14 +22,14 @@
   "menu": {
     "items": [
       {
-        "label": "Create Portal Post",
-        "description": "Create a new portal custom post for testing and review.",
+        "label": "Create Navigation Post",
+        "description": "Create a new community navigation post for testing and review.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-post"
       },
       {
-        "label": "Create Portal Admin Panel",
+        "label": "Create Navigation Admin Panel",
         "description": "Create the moderator configuration panel. Pin the resulting post to your profile if desired.",
         "location": "subreddit",
         "forUserType": "moderator",
