@@ -1,5 +1,6 @@
 import { showForm, showToast } from '@devvit/web/client';
-import { useEffect, useRef, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import './admin.css';
 import { getDefaultAdminConfig, type AdminConfig, type ManagedButton, type ManagedButtonType, type ManagedAsset } from '../shared/subreddit';
 
@@ -107,3 +108,10 @@ export const AdminApp = () => {
     <footer className="footer"><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply to Existing Posts'}</button><p>The three-dot Create Navigation Post remains separate for review/testing and creates an independent post.</p></footer>
   </div></main>;
 };
+
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <AdminApp />
+  </StrictMode>,
+);
