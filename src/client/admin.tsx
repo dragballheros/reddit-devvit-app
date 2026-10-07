@@ -117,6 +117,29 @@ export const AdminApp = () => {
     }
   };
 
+  const removeAsset = (assetId: string) => {
+    setConfig((current) => {
+      const asset = current.assets.find((item) => item.id === assetId);
+      if (!asset) return current;
+
+      const nextWelcome = (current.welcomeGifVariants ?? []).filter((url) => url !== asset.url);
+      const welcomeGifWasRemoved = current.welcomeGif === asset.url;
+
+      return {
+        ...current,
+        assets: current.assets.filter((item) => item.id !== assetId),
+        welcomeGif: welcomeGifWasRemoved ? nextWelcome[0] : current.welcomeGif,
+        welcomeGifVariants: nextWelcome,
+        buttons: current.buttons.map((button) => ({
+          ...button,
+          background: button.background === asset.url ? undefined : button.background,
+          icon: button.icon === asset.url ? undefined : button.icon,
+        })),
+      };
+    });
+    showToast('Asset removed. Save & Apply to keep the change.');
+  };
+
   const addSubreddit = () => {
     const normalized = newSubreddit.trim().replace(/^r\//i, '');
     if (!normalized) return;
