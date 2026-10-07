@@ -191,17 +191,30 @@ app.post('/api/admin/upload-asset', async (c) => {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
-    const payload = await c.req.json<{ url?: string; type?: 'image' | 'gif' }>();
-    const mediaType = payload.type === 'gif' || payload.type === 'image'
-      ? payload.type
-      : undefined;
+    const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
+    const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
+    const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
+    const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
 
-    if (!payload.url || !mediaType) {
-      return c.json({ error: 'Invalid media.' }, 400);
+    if (!mediaType || !match) {
+      return c.json({ error: 'Invalid image data.' }, 400);
+    }
+
+    const mimeType = match[1];
+    const base64 = match[2];
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    const byteLength = Math.floor((base64.length * 3) / 4) - padding;
+
+    if (byteLength > 20 * 1024 * 1024) {
+      return c.json({ error: 'Image exceeds Reddit\'s 20 MB upload limit.' }, 413);
+    }
+
+    if ((mimeType === 'image/gif') !== (mediaType === 'gif')) {
+      return c.json({ error: 'Image type does not match the selected media type.' }, 400);
     }
 
     const uploaded = await media.upload({
-      url: payload.url,
+      url: dataUrl,
       type: mediaType,
     });
 
@@ -209,16 +222,15 @@ app.post('/api/admin/upload-asset', async (c) => {
       return c.json({ error: 'Reddit did not return a usable media URL.' }, 502);
     }
 
-    return c.json({ url: uploaded.mediaUrl, type: payload.type });
+    return c.json({ url: uploaded.mediaUrl, type: mediaType });
   } catch (error) {
     console.error('Failed to upload admin asset to Reddit Media API', error);
     return c.json(
-      { error: 'Reddit could not finish the image upload. Try the image again or use a smaller file.' },
+      { error: error instanceof Error ? error.message : 'Reddit could not finish the image upload.' },
       502,
     );
   }
 });
-
 app.post('/api/moderator/create-post', async (c) => {
   try {
     const subredditName = context.subredditName;
