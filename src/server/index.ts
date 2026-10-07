@@ -241,7 +241,14 @@ app.post('/internal/menu/create-admin', async (c) => {
     }
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
-      return c.json<UiResponse>({ showToast: 'Admin panel already exists in the test subreddit.' });
+      try {
+        const oldAdminPost = await reddit.getPostById(existing as RedditPostId);
+        await oldAdminPost.remove(false);
+        console.log('Removed previous admin panel ' + existing + ' from r/' + subredditName);
+      } catch (error) {
+        console.warn('Previous admin panel could not be removed; continuing with a fresh panel.', error);
+      }
+      await redis.del(ADMIN_POST_KEY);
     }
 
     const config = getDefaultAdminConfig();
