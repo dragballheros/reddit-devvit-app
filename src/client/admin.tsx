@@ -84,7 +84,7 @@ export const AdminApp = () => {
       if (!result || result.action === 'CANCELED' || !result.values?.media) return;
 
       const url = String(result.values.media);
-      if (!/^https?:\\/\\/[^\\s]+$/i.test(url)) {
+      if (!/^https?:\/\/[^\s]+$/i.test(url)) {
         showToast('Reddit did not return a usable image URL.');
         return;
       }
