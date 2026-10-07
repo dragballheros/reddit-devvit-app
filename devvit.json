@@ -30,7 +30,7 @@
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create the moderator configuration panel directly on the app profile and pin it automatically.",
+        "description": "Create the moderator configuration post and automatically pin it to the app profile.",
         "location": "post",
         "forUserType": "moderator",
         "postFilter": "currentApp",
