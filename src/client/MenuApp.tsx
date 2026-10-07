@@ -156,8 +156,10 @@ export const MenuApp = () => {
   }, []);
 
   const sessionGifSrc = useMemo(() => {
-    const variants = config.welcomeGif
-      ? [config.welcomeGif]
+    const configuredWelcomeGifs = (config.welcomeGifVariants ?? (config.welcomeGif ? [config.welcomeGif] : []))
+      .filter((url): url is string => typeof url === 'string' && url.trim().length > 0);
+    const variants = configuredWelcomeGifs.length
+      ? configuredWelcomeGifs
       : isMobile
         ? config.introGifMobileVariants ?? [config.introGifMobile]
         : config.introGifDesktopVariants ?? [config.introGifDesktop];
