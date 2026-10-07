@@ -250,6 +250,10 @@ export const MenuApp = () => {
     return () => window.clearInterval(timer);
   }, [config.backgroundStyle]);
 
+  if (!configLoaded) {
+    return <div className="app app--loading" aria-busy="true" aria-label="Loading community navigation" />;
+  }
+
   const portals = useMemo(() => {
     if (!configLoaded) return [];
 
