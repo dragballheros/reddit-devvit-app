@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis } from '@devvit/web/server';
 import { getDevvitConfig } from '@devvit/shared-types/server/get-devvit-config.js';
-import { LinksAndCommentsDefinition } from '@devvit/protos/types/devvit/plugin/redditapi/linksandcomments/linksandcomments_svc.js';
+import { LinksAndCommentsDefinition, type LinksAndComments } from '@devvit/protos/types/devvit/plugin/redditapi/linksandcomments/linksandcomments_svc.js';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { APP_CONFIG, getDefaultAdminConfig, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
@@ -14,7 +14,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const pinPostToAppProfile = async (postId: RedditPostId): Promise<void> => {
   const delays = [0, 1000, 2500, 5000];
   let lastError: unknown;
-  const linksAndComments = getDevvitConfig().use(LinksAndCommentsDefinition);
+  const linksAndComments = getDevvitConfig().use<LinksAndComments>(LinksAndCommentsDefinition);
 
   for (const delay of delays) {
     if (delay > 0) await sleep(delay);
