@@ -349,6 +349,7 @@ button { font: inherit; }
 }
 
 
+.menu__content::before {
   content: "";
   position: absolute;
   inset: 7px;
