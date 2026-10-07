@@ -185,99 +185,27 @@ export const MenuApp = () => {
   }, [hasWelcomeGif, isMobile]);
 
   const portals = useMemo(() => {
-    if (config.buttons?.length) {
-      return config.buttons
-        .filter((button) => button.enabled !== false)
-        .map((button) => ({
-          label: button.label,
-          background: button.background,
-          backgroundGradient: button.backgroundGradient,
-          icon: button.icon,
-          accent: button.accent,
-          labelFont: button.labelFont,
-          labelSize: button.labelSize,
-          labelColor: button.labelColor,
-          labelWeight: button.labelWeight,
-          backgroundPositionX: button.backgroundPositionX,
-          backgroundPositionY: button.backgroundPositionY,
-          backgroundScale: button.backgroundScale,
-          onClick: () => {
-            if (button.type === 'modmail') navigateTo(getModmailLink(context.subredditName));
-            else if (button.url) navigateTo(button.url);
-          },
-        }));
-    }
-
-    const subredditPortals = config.links.otherSubreddits
-      .filter((name) => normalizeSubredditName(name) !== currentSubredditName)
-      .map((name) => {
-        const key = normalizeSubredditName(name);
-        const asset = config.portals.subreddits[key];
-        return {
-          label: name,
-          background: asset?.background,
-          backgroundGradient: asset?.backgroundGradient,
-          icon: asset?.icon,
-          accent: asset?.accent,
-          labelFont: asset?.labelFont,
-          labelSize: asset?.labelSize,
-          labelColor: asset?.labelColor,
-          labelWeight: asset?.labelWeight,
-          onClick: () => navigateTo(`https://www.reddit.com/r/${name}/`),
-        };
-      });
-
-    return [
-      {
-        label: 'AnimeH34',
-        background: config.portals.animeh34.background,
-        icon: config.portals.animeh34.icon,
-        accent: config.portals.animeh34.accent,
-        labelFont: config.portals.animeh34.labelFont,
-        labelSize: config.portals.animeh34.labelSize,
-        labelColor: config.portals.animeh34.labelColor,
-        labelWeight: config.portals.animeh34.labelWeight,
-        onClick: () => navigateTo('https://www.reddit.com/r/AnimeH34/'),
-      },
-      ...subredditPortals,
-      {
-        label: 'X/Twitter (ElfariaNSFW)',
-        background: config.portals.x.background,
-        backgroundGradient: config.portals.x.backgroundGradient,
-        icon: config.portals.x.icon,
-        accent: config.portals.x.accent,
-        labelFont: config.portals.x.labelFont,
-        labelSize: config.portals.x.labelSize,
-        labelColor: config.portals.x.labelColor,
-        labelWeight: config.portals.x.labelWeight,
-        onClick: () => navigateTo(config.links.twitter),
-      },
-      {
-        label: 'AnimeH34 Discord',
-        background: config.portals.discord.background,
-        backgroundGradient: config.portals.discord.backgroundGradient,
-        icon: config.portals.discord.icon,
-        accent: config.portals.discord.accent,
-        labelFont: config.portals.discord.labelFont,
-        labelSize: config.portals.discord.labelSize,
-        labelColor: config.portals.discord.labelColor,
-        labelWeight: config.portals.discord.labelWeight,
-        onClick: () => navigateTo(config.links.discord),
-      },
-      {
-        label: 'Modmail',
-        background: config.portals.modmail.background,
-        backgroundGradient: config.portals.modmail.backgroundGradient,
-        icon: config.portals.modmail.icon,
-        accent: config.portals.modmail.accent,
-        labelFont: config.portals.modmail.labelFont,
-        labelSize: config.portals.modmail.labelSize,
-        labelColor: config.portals.modmail.labelColor,
-        labelWeight: config.portals.modmail.labelWeight,
-        onClick: () => navigateTo(modmailLink),
-      },
-    ];
-  }, [currentSubredditName, modmailLink, config]);
+    return (config.buttons ?? [])
+      .filter((button) => button.enabled !== false)
+      .map((button) => ({
+        label: button.label,
+        background: button.background,
+        backgroundGradient: button.backgroundGradient,
+        icon: button.icon,
+        accent: button.accent,
+        labelFont: button.labelFont,
+        labelSize: button.labelSize,
+        labelColor: button.labelColor,
+        labelWeight: button.labelWeight,
+        backgroundPositionX: button.backgroundPositionX,
+        backgroundPositionY: button.backgroundPositionY,
+        backgroundScale: button.backgroundScale,
+        onClick: () => {
+          if (button.type === 'modmail') navigateTo(getModmailLink(context.subredditName));
+          else if (button.url) navigateTo(button.url);
+        },
+      }));
+  }, [config.buttons]);
 
   return (
     <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${isAndroid ? 'app--android' : ''}`}>
