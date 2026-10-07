@@ -58,6 +58,7 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
           : admin.welcomeGif
             ? [admin.welcomeGif]
             : undefined,
+        welcomeGifFitByUrl: admin.welcomeGifFitByUrl,
         buttons: admin.buttons,
       }
     : APP_CONFIG;
