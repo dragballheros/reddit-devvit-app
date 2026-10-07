@@ -36,7 +36,7 @@ Moderators can create and customize buttons for:
 - Modmail
 - Custom external links
 
-Buttons can optionally use uploaded Reddit-hosted media or CSS gradients. A button without an image uses its configured gradient.
+Buttons can use Reddit-hosted media, Catbox-hosted media, or CSS gradients. Reddit-hosted uploads are subject to Reddit's media limits. Catbox URLs are kept on Catbox and served through the app's same-origin image proxy, so large Catbox images can exceed Reddit's 20 MB media-upload limit. Catbox must be available through the app's approved HTTP fetch domains. A button without an image uses its configured gradient.
 
 ## Review and testing
 
