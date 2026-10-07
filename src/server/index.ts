@@ -203,6 +203,131 @@ app.post('/api/admin/save', async (c) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const ASSET_MAX_BYTES = 20 * 1024 * 1024;
+const ASSET_CHUNK_MAX_BYTES = 1.5 * 1024 * 1024;
+const ASSET_UPLOAD_TTL_SECONDS = 15 * 60;
+
+const getAssetUploadKey = (uploadId: string) => {
+  const userKey = String(context.userId ?? context.username ?? 'anonymous').replace(/[^a-zA-Z0-9:_-]/g, '_');
+  return `community-portal:asset-upload:${userKey}:${uploadId}`;
+};
+
+const isUploadId = (value?: string): boolean =>
+  typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
+
+app.post('/api/admin/upload-asset/chunk', async (c) => {
+  try {
+    if (!(await requireModerator(context.subredditName))) {
+      return c.json({ error: 'Moderator access required.' }, 403);
+    }
+
+    const payload = await c.req.json<{
+      uploadId?: string;
+      index?: number;
+      totalChunks?: number;
+      totalBytes?: number;
+      type?: 'image' | 'gif';
+      mimeType?: string;
+      data?: string;
+    }>();
+    if (!isUploadId(payload.uploadId) || !Number.isInteger(payload.index) || !Number.isInteger(payload.totalChunks) || !Number.isInteger(payload.totalBytes) || !payload.data) {
+      return c.json({ error: 'Invalid upload chunk.' }, 400);
+    }
+
+    const index = payload.index as number;
+    const totalChunks = payload.totalChunks as number;
+    const totalBytes = payload.totalBytes as number;
+    const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
+    const mimeType = typeof payload.mimeType === 'string' ? payload.mimeType : '';
+    if (!mediaType || !/^image\/(?:png|jpeg|webp|gif)$/i.test(mimeType)) {
+      return c.json({ error: 'Unsupported image type.' }, 400);
+    }
+    if (totalBytes <= 0 || totalBytes > ASSET_MAX_BYTES || totalChunks < 1 || totalChunks > 32 || index < 0 || index >= totalChunks) {
+      return c.json({ error: 'Asset exceeds Reddit\'s 20 MB media limit.' }, 413);
+    }
+    if ((mediaType === 'gif') !== (mimeType.toLowerCase() === 'image/gif')) {
+      return c.json({ error: 'Media type does not match the uploaded file.' }, 400);
+    }
+
+    const match = payload.data.match(/^[A-Za-z0-9+/=]+$/);
+    if (!match) return c.json({ error: 'Invalid upload chunk encoding.' }, 400);
+    const padding = payload.data.endsWith('==') ? 2 : payload.data.endsWith('=') ? 1 : 0;
+    const byteLength = Math.floor((payload.data.length * 3) / 4) - padding;
+    if (byteLength <= 0 || byteLength > ASSET_CHUNK_MAX_BYTES) {
+      return c.json({ error: 'Upload chunk is too large.' }, 413);
+    }
+
+    const key = getAssetUploadKey(payload.uploadId!);
+    const existingMeta = await redis.hGet(key, '_meta');
+    const meta = JSON.stringify({ totalChunks, totalBytes, type: mediaType, mimeType });
+    if (existingMeta && existingMeta !== meta) {
+      return c.json({ error: 'Upload session metadata changed.' }, 409);
+    }
+
+    await redis.hSet(key, {
+      _meta: existingMeta ?? meta,
+      [String(index)]: payload.data,
+    });
+    await redis.expire(key, ASSET_UPLOAD_TTL_SECONDS);
+
+    return c.json({ ok: true, index, totalChunks });
+  } catch (error) {
+    console.error('Failed to receive asset upload chunk', error);
+    return c.json({ error: 'Failed to receive the upload chunk.' }, 500);
+  }
+});
+
+app.post('/api/admin/upload-asset/finalize', async (c) => {
+  try {
+    if (!(await requireModerator(context.subredditName))) {
+      return c.json({ error: 'Moderator access required.' }, 403);
+    }
+
+    const payload = await c.req.json<{ uploadId?: string }>();
+    if (!isUploadId(payload.uploadId)) return c.json({ error: 'Invalid upload session.' }, 400);
+
+    const key = getAssetUploadKey(payload.uploadId);
+    const rawMeta = await redis.hGet(key, '_meta');
+    if (!rawMeta) return c.json({ error: 'Upload session expired. Please upload the asset again.' }, 410);
+
+    const meta = JSON.parse(rawMeta) as { totalChunks: number; totalBytes: number; type: 'image' | 'gif'; mimeType: string };
+    if (!Number.isInteger(meta.totalChunks) || meta.totalChunks < 1 || meta.totalChunks > 32 || meta.totalBytes <= 0 || meta.totalBytes > ASSET_MAX_BYTES) {
+      await redis.del(key);
+      return c.json({ error: 'Invalid upload session.' }, 400);
+    }
+
+    const parts: string[] = [];
+    for (let index = 0; index < meta.totalChunks; index += 1) {
+      const part = await redis.hGet(key, String(index));
+      if (!part) return c.json({ error: `Upload is incomplete. Missing chunk ${index + 1} of ${meta.totalChunks}.` }, 409);
+      parts.push(part);
+    }
+
+    const dataUrl = `data:${meta.mimeType};base64,${parts.join('')}`;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const uploaded = await media.upload({ url: dataUrl, type: meta.type });
+        if (uploaded.mediaUrl) {
+          await redis.del(key);
+          return c.json({ url: uploaded.mediaUrl, type: meta.type });
+        }
+        lastError = new Error('Reddit did not return a media URL.');
+      } catch (error) {
+        lastError = error;
+        console.warn(`Asset media upload attempt ${attempt} failed`, error);
+      }
+      if (attempt < 3) await sleep(attempt * 2000);
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Reddit media upload failed.');
+  } catch (error) {
+    console.error('Failed to finalize admin asset upload', error);
+    const message = error instanceof Error ? error.message : 'Reddit could not finish the image upload.';
+    return c.json({ error: `Reddit media upload failed after 3 attempts: ${message}` }, 502);
+  }
+});
+
 app.post('/api/admin/upload-asset', async (c) => {
   try {
     if (!(await requireModerator(context.subredditName))) {
@@ -221,8 +346,8 @@ app.post('/api/admin/upload-asset', async (c) => {
     const base64 = match[2];
     const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
     const byteLength = Math.floor((base64.length * 3) / 4) - padding;
-    if (byteLength > 2.5 * 1024 * 1024) {
-      return c.json({ error: 'Asset exceeds the 2.5 MB Asset Library upload limit.' }, 413);
+    if (byteLength > ASSET_MAX_BYTES) {
+      return c.json({ error: 'Reddit media uploads are limited to 20 MB.' }, 413);
     }
 
     let lastError: unknown;
