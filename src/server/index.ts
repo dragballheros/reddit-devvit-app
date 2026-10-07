@@ -300,14 +300,28 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
       return c.json({ error: 'Invalid upload session.' }, 400);
     }
 
-    const parts: string[] = [];
+    const parts: Buffer[] = [];
+    let totalBytes = 0;
     for (let index = 0; index < meta.totalChunks; index += 1) {
       const part = await redis.hGet(key, String(index));
       if (!part) return c.json({ error: `Upload is incomplete. Missing chunk ${index + 1} of ${meta.totalChunks}.` }, 409);
-      parts.push(part);
+      try {
+        const bytes = Buffer.from(part, 'base64');
+        if (bytes.length === 0) return c.json({ error: `Upload chunk ${index + 1} is empty or invalid.` }, 400);
+        parts.push(bytes);
+        totalBytes += bytes.length;
+      } catch {
+        return c.json({ error: `Upload chunk ${index + 1} is invalid.` }, 400);
+      }
     }
 
-    const dataUrl = `data:${meta.mimeType};base64,${parts.join('')}`;
+    if (totalBytes !== meta.totalBytes) {
+      await redis.del(key);
+      return c.json({ error: 'Uploaded data size does not match the upload metadata.' }, 400);
+    }
+
+    const combined = Buffer.concat(parts, totalBytes);
+    const dataUrl = `data:${meta.mimeType};base64,${combined.toString('base64')}`;
     let lastError: unknown;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
