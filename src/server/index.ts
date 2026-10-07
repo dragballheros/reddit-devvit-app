@@ -23,61 +23,6 @@ const encodeConfig = (config: AdminConfig): string =>
 const decodeConfig = (value: string): AdminConfig =>
   JSON.parse(inflateSync(Buffer.from(value, 'base64')).toString('utf8')) as AdminConfig;
 
-const PUBLIC_IMAGE_ERROR = 'This image cannot be used.';
-const MODERATION_UNAVAILABLE_ERROR = 'This image could not be verified, so it cannot be used.';
-
-type ModerationResponse = {
-  results?: Array<{
-    flagged?: boolean;
-    categories?: Record<string, boolean>;
-  }>;
-};
-
-const moderateImage = async (imageUrl: string): Promise<'approved' | 'blocked'> => {
-  const apiKeyValue = await context.settings.get('OPENAI_API_KEY');
-  const apiKey = typeof apiKeyValue === 'string' ? apiKeyValue.trim() : '';
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
-
-  const response = await fetch('https://api.openai.com/v1/moderations', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'omni-moderation-latest',
-      input: [
-        {
-          type: 'image_url',
-          image_url: { url: imageUrl },
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI moderation HTTP ${response.status}.`);
-  }
-
-  const payload = await response.json() as ModerationResponse;
-  const result = payload.results?.[0];
-  if (!result || !result.categories) {
-    throw new Error('OpenAI moderation returned no classification result.');
-  }
-
-  const sexuallyExplicit = Boolean(
-    result.categories.sexual || result.categories['sexual/minors'],
-  );
-  const highRisk = Boolean(result.categories['violence/graphic']);
-
-  return result.flagged || sexuallyExplicit || highRisk ? 'blocked' : 'approved';
-};
-
-const requireImageModeration = async (imageUrl: string): Promise<void> => {
-  const result = await moderateImage(imageUrl);
-  if (result === 'blocked') throw new Error(PUBLIC_IMAGE_ERROR);
-};
-
 const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | undefined> => {
   const redditPostId = toRedditPostId(postId);
   if (!redditPostId) return undefined;
@@ -243,143 +188,49 @@ app.post('/api/admin/save', async (c) => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const isAllowedCatboxUrl = (value: string): boolean => {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'https:' && ['catbox.moe', 'files.catbox.moe'].includes(parsed.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
-};
-
-const fetchCatboxImage = async (initialUrl: string): Promise<Response> => {
-  let currentUrl = initialUrl;
-
-  for (let redirect = 0; redirect < 4; redirect += 1) {
-    const response = await fetch(currentUrl, {
-      method: 'GET',
-      redirect: 'manual',
-      headers: {
-        accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      },
-    });
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (!location) throw new Error('Catbox returned a redirect without a location.');
-      const next = new URL(location, currentUrl).toString();
-      if (!isAllowedCatboxUrl(next)) throw new Error('Catbox redirected to an unapproved host.');
-      currentUrl = next;
-      continue;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Catbox returned HTTP ${response.status}.`);
-    }
-
-    const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
-    if (!contentType?.startsWith('image/')) {
-      throw new Error('The Catbox URL did not return an image. Use a direct image file URL.');
-    }
-
-    const headers = new Headers();
-    headers.set('Content-Type', contentType);
-    headers.set('Cache-Control', 'public, max-age=3600');
-    const length = response.headers.get('content-length');
-    if (length) headers.set('Content-Length', length);
-    return new Response(response.body, { status: 200, headers });
-  }
-
-  throw new Error('Too many Catbox redirects.');
-};
-
-app.get('/api/catbox-asset', async (c) => {
-  try {
-    const sourceUrl = c.req.query('url')?.trim();
-    if (!sourceUrl || !isAllowedCatboxUrl(sourceUrl)) {
-      return c.json({ error: 'Only HTTPS Catbox image URLs are supported.' }, 400);
-    }
-
-    return await fetchCatboxImage(sourceUrl);
-  } catch (error) {
-    console.error('Failed to proxy Catbox asset', error);
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Unable to load Catbox asset.' },
-      502,
-    );
-  }
-});
-
 app.post('/api/admin/upload-asset', async (c) => {
   try {
     if (!(await requireModerator(context.subredditName))) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
-    const payload = await c.req.json<{
-      dataUrl?: string;
-      sourceUrl?: string;
-      type?: 'image' | 'gif';
-    }>();
+    const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
+    const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
     const mediaType = payload.type === 'gif' || payload.type === 'image' ? payload.type : undefined;
-    if (!mediaType) return c.json({ error: 'Invalid media type.' }, 400);
+    const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
 
-    let sourceForModeration = '';
-    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl.trim()) {
-      const sourceUrl = payload.sourceUrl.trim();
-      if (!isAllowedCatboxUrl(sourceUrl)) {
-        return c.json({ error: 'Only direct HTTPS Catbox links are allowed.' }, 400);
-      }
-      sourceForModeration = sourceUrl;
-    } else {
-      const dataUrl = typeof payload.dataUrl === 'string' ? payload.dataUrl : '';
-      const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
-      if (!match) return c.json({ error: 'Invalid image data.' }, 400);
-
-      const base64 = match[2];
-      const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
-      const byteLength = Math.floor((base64.length * 3) / 4) - padding;
-      if (byteLength > 2.5 * 1024 * 1024) {
-        return c.json({ error: 'Local uploads are limited to 2.5 MB by the Devvit Web request size.' }, 413);
-      }
-      sourceForModeration = dataUrl;
+    if (!mediaType || !match) {
+      return c.json({ error: 'Invalid image data.' }, 400);
     }
 
-    try {
-      await requireImageModeration(sourceForModeration);
-    } catch (error) {
-      console.warn('Admin media blocked or could not be moderated', error);
-      return c.json({
-        error: error instanceof Error && error.message === PUBLIC_IMAGE_ERROR
-          ? PUBLIC_IMAGE_ERROR
-          : MODERATION_UNAVAILABLE_ERROR,
-      }, 422);
+    const base64 = match[2];
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    const byteLength = Math.floor((base64.length * 3) / 4) - padding;
+    if (byteLength > 2.5 * 1024 * 1024) {
+      return c.json({ error: 'Asset exceeds the 2.5 MB Asset Library upload limit.' }, 413);
     }
 
-    if (typeof payload.sourceUrl === 'string' && payload.sourceUrl.trim()) {
-      return c.json({ url: payload.sourceUrl.trim(), type: mediaType, hosting: 'catbox' });
-    }
-
-    const dataUrl = payload.dataUrl!.trim();
     let lastError: unknown;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
         const uploaded = await media.upload({ url: dataUrl, type: mediaType });
         if (uploaded.mediaUrl) {
-          return c.json({ url: uploaded.mediaUrl, type: mediaType, hosting: 'reddit' });
+          return c.json({ url: uploaded.mediaUrl, type: mediaType });
         }
         lastError = new Error('Reddit did not return a media URL.');
       } catch (error) {
         lastError = error;
         console.warn(`Asset media upload attempt ${attempt} failed`, error);
       }
+
       if (attempt < 3) await sleep(attempt * 2000);
     }
 
     throw lastError instanceof Error ? lastError : new Error('Reddit media upload failed.');
   } catch (error) {
-    console.error('Failed to upload admin asset after moderation', error);
-    return c.json({ error: error instanceof Error ? error.message : MODERATION_UNAVAILABLE_ERROR }, 502);
+    console.error('Failed to upload admin asset to Reddit Media API after retries', error);
+    const message = error instanceof Error ? error.message : 'Reddit could not finish the image upload.';
+    return c.json({ error: `Reddit media upload failed after 3 attempts: ${message}` }, 502);
   }
 });
 
