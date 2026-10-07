@@ -426,15 +426,15 @@ button { font: inherit; }
 }
 
 .intro__media {
-  width: 100%;
-  height: 100%;
+  width: auto;
   max-width: none;
-  max-height: none;
+  height: 96vh;
+  max-height: 96vh;
   object-fit: contain;
   object-position: center;
 }
 
-.intro__media--wide { width: 100%; height: 100%; }
+.intro__media--wide { width: max-content; }
 
 .intro__title {
   position: absolute;
