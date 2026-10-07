@@ -47,7 +47,7 @@ The admin panel can also create and update managed navigation posts in selected 
 
 ## Moderator admin panel
 
-The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the zero-title configuration post in the current subreddit as required by Devvit, then automatically pins that post to the app account's profile.
+The **Create Navigation Admin Panel** action is available from the app's own custom-post menu, not the subreddit menu. It creates the zero-title configuration post in the current subreddit as required by Devvit. The configuration post can be pinned using Reddit's normal post pinning controls.
 
 ## Development
 
