@@ -35,6 +35,7 @@ export type ManagedAsset = { id: string; name: string; url: string; type: 'image
 export type AdminConfig = {
   version: 1;
   welcomeGif?: string;
+  welcomeGifVariants?: string[];
   buttons: ManagedButton[];
   managedSubreddits: string[];
   assets: ManagedAsset[];
@@ -49,8 +50,7 @@ export type AppConfig = {
   menuGifMobile: string;
   introGifFit: 'contain' | 'cover';
   welcomeGif?: string;
-  buttons?: ManagedButton[];
-  welcomeGif?: string;
+  welcomeGifVariants?: string[];
   buttons?: ManagedButton[];
   links: {
     discord: string;
@@ -164,6 +164,7 @@ export const getSubredditLink = (subredditName?: string | null): string => {
 export const getDefaultAdminConfig = (): AdminConfig => ({
   version: 1,
   welcomeGif: undefined,
+  welcomeGifVariants: [],
   managedSubreddits: [],
   assets: [],
   buttons: [
