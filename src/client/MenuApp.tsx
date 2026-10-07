@@ -177,6 +177,7 @@ const PortalButton = ({
 export const MenuApp = () => {
   const [isIntroHidden, setIsIntroHidden] = useState(false);
   const [config, setConfig] = useState(APP_CONFIG);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const isMobile = useIsMobile();
   const isAndroid = context.client?.name === 'ANDROID';
 
@@ -185,9 +186,16 @@ export const MenuApp = () => {
     fetch('/api/runtime-config')
       .then((response) => response.json())
       .then((payload: { config?: typeof APP_CONFIG }) => {
-        if (active && payload.config) setConfig(payload.config);
+        if (!active) return;
+        if (payload.config) setConfig(payload.config);
+        setConfigLoaded(true);
       })
-      .catch((error) => console.warn('Using bundled community navigation configuration:', error));
+      .catch((error) => {
+        if (!active) return;
+        console.warn('Using bundled community navigation configuration:', error);
+        setConfig(APP_CONFIG);
+        setConfigLoaded(true);
+      });
     return () => { active = false; };
   }, []);
 
@@ -221,6 +229,8 @@ export const MenuApp = () => {
   }, [hasWelcomeGif, isMobile]);
 
   const portals = useMemo(() => {
+    if (!configLoaded) return [];
+
     const configuredButtons = (config.buttons ?? [])
       .filter((button) => button.enabled !== false)
       .map((button) => ({
