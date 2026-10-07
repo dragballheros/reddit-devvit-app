@@ -60,55 +60,71 @@ export const AdminApp = () => {
     buttons: [...current.buttons, { id: `button-${Date.now()}`, label: 'New Button', type: 'external', accent: '#b18cff', backgroundGradient: 'linear-gradient(120deg,#1b1b2f,#3d2c63,#090a12)', enabled: true }],
   }));
 
-  const waitForHostedImage = (url: string) => new Promise<void>((resolve, reject) => {
-    const image = new Image();
-    const timeout = window.setTimeout(() => {
-      image.src = '';
-      reject(new Error('Reddit accepted the upload, but its CDN did not make the image available.'));
-    }, 10000);
-    image.onload = () => {
-      window.clearTimeout(timeout);
-      resolve();
-    };
-    image.onerror = () => {
-      window.clearTimeout(timeout);
-      reject(new Error('Reddit accepted the upload, but the hosted image could not be loaded.'));
-    };
-    image.src = url;
-  });
-
   const uploadMedia = async (kind: 'welcome'|'background'|'icon', buttonId?: string) => {
     try {
       const result = await showForm({
         title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon',
         fields: [
           { type: 'string', name: 'name', label: 'Asset name', required: true },
-          {
-            type: 'image',
-            name: 'media',
-            label: 'Image or GIF',
-            required: true,
-            helpText: 'PNG, JPEG, WEBP, or GIF. Maximum 20 MB.',
-          },
         ],
       });
 
-      if (!result || result.action === 'CANCELED' || !result.values?.media) return;
+      if (!result || result.action === 'CANCELED' || !result.values?.name) return;
 
-      const url = String(result.values.media);
-      if (!/^https?:\/\/[^\s]+$/i.test(url)) {
-        showToast('Reddit did not return a usable image URL.');
+      const file = await new Promise<File | null>((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = kind === 'welcome'
+          ? 'image/gif'
+          : 'image/png,image/jpeg,image/webp,image/gif';
+        input.onchange = () => resolve(input.files?.[0] ?? null);
+        input.click();
+      });
+
+      if (!file) return;
+
+      const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+      if (!allowedTypes.has(file.type)) {
+        showToast('Unsupported image type. Use PNG, JPEG, WEBP, or GIF.');
         return;
       }
 
-      showToast('Checking Reddit-hosted asset…');
-      await waitForHostedImage(url);
+      if (kind === 'welcome' && file.type !== 'image/gif') {
+        showToast('Welcome media must be a GIF.');
+        return;
+      }
+
+      // Devvit Web requests have a small JSON body limit, so custom uploads
+      // are deliberately kept below 2.5 MB before they reach the server.
+      if (file.size > 2.5 * 1024 * 1024) {
+        showToast('For Asset Library uploads, use an image under 2.5 MB.');
+        return;
+      }
+
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string'
+          ? resolve(reader.result)
+          : reject(new Error('Could not read the selected image.'));
+        reader.onerror = () => reject(new Error('Could not read the selected image.'));
+        reader.readAsDataURL(file);
+      });
+
+      showToast('Uploading asset to Reddit…');
+      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>('/api/admin/upload-asset', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl,
+          type: file.type === 'image/gif' ? 'gif' : 'image',
+        }),
+      });
 
       const asset: ManagedAsset = {
         id: `asset-${Date.now()}`,
-        name: String(result.values.name ?? 'Uploaded asset'),
-        url,
-        type: kind === 'welcome' ? 'gif' : 'image',
+        name: String(result.values.name),
+        url: uploaded.url,
+        type: uploaded.type,
       };
 
       setConfig((current) => ({
@@ -117,16 +133,16 @@ export const AdminApp = () => {
         ...(kind === 'welcome'
           ? {
               welcomeGif: current.welcomeGifVariants?.[0] ?? current.welcomeGif,
-              welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), url],
+              welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), uploaded.url],
             }
           : {}),
       }));
 
       if (buttonId) {
-        updateButton(buttonId, kind === 'background' ? { background: url } : { icon: url });
+        updateButton(buttonId, kind === 'background' ? { background: uploaded.url } : { icon: uploaded.url });
       }
 
-      showToast('Asset uploaded and verified. Click Save & Apply to persist it.');
+      showToast('Asset uploaded successfully. Click Save & Apply to persist it.');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Asset upload failed.');
     }
