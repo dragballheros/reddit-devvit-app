@@ -63,7 +63,7 @@ export const AdminApp = () => {
   const uploadMedia = async (kind: 'welcome'|'background'|'icon', buttonId?: string) => {
     try {
       const result = await showForm({
-        title: kind === 'welcome' ? 'Upload Welcome GIF' : kind === 'background' ? 'Upload Button Background' : 'Upload Button Icon',
+        title: kind === 'welcome' ? 'Name Welcome GIF' : kind === 'background' ? 'Name Button Background' : 'Name Button Icon',
         fields: [
           {
             type: 'string',
@@ -71,46 +71,63 @@ export const AdminApp = () => {
             label: 'Asset name',
             required: true,
           },
-          {
-            type: 'image',
-            name: 'media',
-            label: 'Image or GIF',
-            required: true,
-            helpText: 'Reddit-hosted uploads are limited to 20 MB.',
-          },
         ],
       });
 
-      if (!result || result.action === 'CANCELED' || !result.values?.media) return;
+      if (!result || result.action === 'CANCELED' || !result.values?.name) return;
 
-      const sourceUrl = String(result.values.media);
-      if (!/^https?:\/\/[^\s]+$/i.test(sourceUrl)) {
-        showToast('Reddit did not return a usable image URL.');
+      const file = await new Promise<File | null>((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = kind === 'welcome'
+          ? 'image/gif'
+          : 'image/png,image/jpeg,image/webp,image/gif';
+        input.onchange = () => resolve(input.files?.[0] ?? null);
+        input.click();
+      });
+
+      if (!file) return;
+
+      const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+      if (!allowedTypes.has(file.type)) {
+        showToast('Unsupported image type. Use PNG, JPEG, WEBP, or GIF.');
         return;
       }
 
-      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>(
-        '/api/admin/upload-asset',
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            url: sourceUrl,
-            type: kind === 'welcome' ? 'gif' : 'image',
-          }),
-        },
-      );
-
-      const url = uploaded.url;
-      if (!/^https?:\/\/[^\s]+$/i.test(url)) {
-        showToast('Reddit did not return a usable hosted asset URL.');
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('Image exceeds Reddit\'s 20 MB upload limit.');
         return;
       }
+
+      if (kind === 'welcome' && file.type !== 'image/gif') {
+        showToast('Welcome media must be a GIF.');
+        return;
+      }
+
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') resolve(reader.result);
+          else reject(new Error('Could not read the selected image.'));
+        };
+        reader.onerror = () => reject(new Error('Could not read the selected image.'));
+        reader.readAsDataURL(file);
+      });
+
+      showToast('Uploading asset…');
+      const uploaded = await api<{ url: string; type: 'image' | 'gif' }>('/api/admin/upload-asset', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl,
+          type: file.type === 'image/gif' ? 'gif' : 'image',
+        }),
+      });
 
       const asset: ManagedAsset = {
         id: `asset-${Date.now()}`,
-        name: String(result.values.name ?? 'Uploaded asset'),
-        url,
+        name: String(result.values.name),
+        url: uploaded.url,
         type: uploaded.type,
       };
 
@@ -120,13 +137,13 @@ export const AdminApp = () => {
         ...(kind === 'welcome'
           ? {
               welcomeGif: current.welcomeGifVariants?.[0] ?? current.welcomeGif,
-              welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), url],
+              welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), uploaded.url],
             }
           : {}),
       }));
 
       if (buttonId) {
-        updateButton(buttonId, kind === 'background' ? { background: url } : { icon: url });
+        updateButton(buttonId, kind === 'background' ? { background: uploaded.url } : { icon: uploaded.url });
       }
 
       showToast('Asset uploaded successfully.');
@@ -134,7 +151,6 @@ export const AdminApp = () => {
       showToast(error instanceof Error ? error.message : 'Asset upload failed.');
     }
   };
-
   const removeAsset = (assetId: string) => {
     setConfig((current) => {
       const asset = current.assets.find((item) => item.id === assetId);
