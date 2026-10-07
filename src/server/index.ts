@@ -225,6 +225,8 @@ app.post('/internal/menu/create-admin', async (c) => {
       subredditName,
       title: '\u200B',
       entry: 'admin',
+      runAs: 'USER',
+      userGeneratedContent: { text: 'Moderator configuration panel.', imageUrls: [] },
       postData: { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() },
     });
     await redis.set(ADMIN_POST_KEY, post.id);
