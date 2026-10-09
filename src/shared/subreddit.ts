@@ -103,12 +103,12 @@ export const normalizeSubredditName = (subredditName?: string | null): string =>
 
 export const getSubredditTitle = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName);
-  return normalized ? `r/${normalized}` : 'r/hentai';
+  return normalized ? `r/${normalized}` : 'Community';
 };
 
 export const getSubredditLabel = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName);
-  if (!normalized) return 'Hentai';
+  if (!normalized) return 'Community';
 
   return normalized
     .split(/[_-]/)
@@ -118,13 +118,13 @@ export const getSubredditLabel = (subredditName?: string | null): string => {
 };
 
 export const getModmailLink = (subredditName?: string | null): string => {
-  const normalized = normalizeSubredditName(subredditName) || 'hentai';
-  return `https://www.reddit.com/message/compose?to=r/${normalized}`;
+  const normalized = normalizeSubredditName(subredditName);
+  return normalized ? `https://www.reddit.com/message/compose?to=r/${normalized}` : '';
 };
 
 export const getSubredditLink = (subredditName?: string | null): string => {
-  const normalized = normalizeSubredditName(subredditName) || 'hentai';
-  return `https://www.reddit.com/r/${normalized}`;
+  const normalized = normalizeSubredditName(subredditName);
+  return normalized ? `https://www.reddit.com/r/${normalized}` : '';
 };
 
 
