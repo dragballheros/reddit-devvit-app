@@ -67,7 +67,6 @@ export type AppConfig = {
     otherSubreddits: string[];
   };
   portals: {
-    animeh34: PortalAsset;
     discord: PortalAsset;
     modmail: PortalAsset;
     x: PortalAsset;
@@ -90,7 +89,6 @@ export const APP_CONFIG: AppConfig = {
     otherSubreddits: [],
   },
   portals: {
-    animeh34: {},
     discord: {},
     modmail: {},
     x: {},
