@@ -9,7 +9,7 @@ export type PortalAsset = {
   accent?: string;
 };
 
-export type ManagedButtonType = 'subreddit' | 'discord' | 'modmail' | 'external';
+export type ManagedButtonType = 'subreddit';
 
 export type ManagedButton = {
   id: string;
@@ -124,6 +124,42 @@ export const getSubredditLink = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName);
   return normalized ? `https://www.reddit.com/r/${normalized}` : '';
 };
+
+export const getSubredditAboutLink = (subredditName?: string | null): string => {
+  const normalized = normalizeSubredditName(subredditName);
+  return normalized ? `https://www.reddit.com/r/${normalized}/about/` : '';
+};
+
+/**
+ * Accept only a direct subreddit landing-page URL on Reddit. Posts, profiles,
+ * query parameters, fragments, and off-platform hosts are deliberately rejected.
+ */
+export const getSubredditNameFromUrl = (value?: string | null): string | undefined => {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+
+  try {
+    const parsed = new URL(value.trim());
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      parsed.protocol !== 'https:' ||
+      !['reddit.com', 'www.reddit.com', 'old.reddit.com'].includes(hostname) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return undefined;
+    }
+
+    const match = parsed.pathname.match(/^\\/r\\/([A-Za-z0-9_]{2,21})\\/?$/i);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+};
+
+export const isValidSubredditUrl = (value?: string | null): boolean =>
+  Boolean(getSubredditNameFromUrl(value));
 
 
 export const getDefaultAdminConfig = (): AdminConfig => ({
