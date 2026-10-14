@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "animeh34pro",
+  "name": "communitypro",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
