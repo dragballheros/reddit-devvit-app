@@ -234,7 +234,7 @@ export const MenuApp = () => {
     if (!configLoaded) return [];
 
     const subredditMenuButton = {
-      label: 'Community Menu',
+      label: 'Subreddit Menu',
       accent: '#6ecbff',
       backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)',
       onClick: () => {
