@@ -151,7 +151,7 @@ export const getSubredditNameFromUrl = (value?: string | null): string | undefin
       return undefined;
     }
 
-    const match = parsed.pathname.match(/^\\/r\\/([A-Za-z0-9_]{2,21})\\/?$/i);
+    const match = parsed.pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})\/?$/i);
     return match?.[1];
   } catch {
     return undefined;
