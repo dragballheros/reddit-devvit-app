@@ -122,7 +122,7 @@ export const getModmailLink = (subredditName?: string | null): string => {
 
 export const getSubredditLink = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName);
-  return normalized ? `https://www.reddit.com/r/${normalized}` : '';
+  return normalized ? `https://www.reddit.com/r/${normalized}/` : '';
 };
 
 export const getSubredditAboutLink = (subredditName?: string | null): string => {
@@ -145,6 +145,7 @@ export const getSubredditNameFromUrl = (value?: string | null): string | undefin
       !['reddit.com', 'www.reddit.com', 'old.reddit.com'].includes(hostname) ||
       parsed.username ||
       parsed.password ||
+      parsed.port ||
       parsed.search ||
       parsed.hash
     ) {
