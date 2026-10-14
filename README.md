@@ -8,6 +8,7 @@ Community Navigation is a reusable Reddit Devvit custom post intended to help me
 
 - A moderator-only **Community Navigation Admin** panel.
 - A configurable navigation page for subreddit destinations.
+- A built-in **Subreddit Menu** button that automatically opens the installed subreddit’s `/about/` page.
 - Customizable button labels and appearance, including colors, gradients, icons, and backgrounds.
 - Optional welcome GIFs and a reusable asset library for uploaded images.
 - Placeholder buttons (**Subreddit 1** through **Subreddit 4**) when no destinations have been configured.
@@ -52,9 +53,21 @@ All uploaded media must be SFW and comply with Reddit's policies.
 
 ### 3. Configure subreddit navigation
 
-Use **+ Add Button** to configure a destination. The intended destination is a subreddit that is appropriate for a general SFW audience.
+Use **+ Add Subreddit Button** to configure a destination. Each configurable button must point directly to a subreddit landing page on Reddit, such as `https://www.reddit.com/r/ExampleSubreddit/`.
 
-Give each button a clear, accurate label. Do not use misleading labels or configure NSFW destinations. Do not use legacy Discord, Modmail, or arbitrary external-link destination options if they appear in the interface.
+**Destination validation is enforced in both the admin interface and the server.** Only HTTPS URLs on `reddit.com`, `www.reddit.com`, or `old.reddit.com` with a direct `/r/SubredditName/` path are accepted. Links to other websites, Reddit posts, user profiles, and URLs with query parameters or fragments are rejected. Saved links are normalized to a canonical Reddit subreddit URL. Do not configure NSFW destinations or use misleading labels.
+
+Discord, Modmail, and arbitrary external-link button types are not supported. Legacy saved buttons of those types are ignored and are not displayed.
+
+### Built-in Subreddit Menu button
+
+Every public navigation post includes a fixed **Subreddit Menu** button. Its destination is generated automatically from the subreddit where that post is running:
+
+`https://www.reddit.com/r/{currentSubreddit}/about/`
+
+For example, a post running in `r/ExampleCommunity` opens `https://www.reddit.com/r/ExampleCommunity/about/`. The subreddit name is obtained from Devvit's current subreddit context; moderators do not enter or edit this URL, and it is not stored as a configurable button.
+
+The destination opens the community's About/community-information page. Reddit may expose community bookmarks and other resources there, but this URL does not guarantee that the Community Bookmarks section will be selected automatically.
 
 ### 4. Manage reusable assets
 
@@ -78,7 +91,7 @@ The moderator **Create Navigation Post** action creates a Community Navigation p
 
 The app is intended to be reusable across SFW communities. A fresh installation has no community-specific destinations or media configured.
 
-When there are no configured buttons, the app shows four disabled placeholders:
+When there are no configured subreddit destinations, the app still shows the fixed **Subreddit Menu** button, followed by four disabled placeholders:
 
 - **Subreddit 1**
 - **Subreddit 2**
@@ -102,10 +115,12 @@ Before using the app in a community:
 1. Create the admin panel in a subreddit you moderate.
 2. Configure only SFW subreddit destinations.
 3. Add and remove SFW welcome media.
-4. Add, edit, and remove navigation buttons.
-5. Upload and delete an asset, confirming references are cleared.
-6. Save and apply the configuration.
-7. Create a standalone test navigation post.
-8. Refresh the navigation post and confirm the saved configuration persists.
-9. Test mobile and web layouts.
-10. Confirm all displayed destinations and media comply with the current Devvit Rules and Reddit policies.
+4. Add, edit, and remove subreddit buttons using valid direct Reddit subreddit URLs.
+5. Confirm an external URL, Reddit post URL, or profile URL is rejected by validation.
+6. Confirm the fixed Subreddit Menu button opens the current subreddit’s `/about/` page and cannot be customized.
+7. Upload and delete an asset, confirming references are cleared.
+8. Save and apply the configuration.
+9. Create a standalone test navigation post.
+10. Refresh the navigation post and confirm the saved configuration persists.
+11. Test mobile and web layouts.
+12. Confirm all displayed destinations and media comply with the current Devvit Rules and Reddit policies.
