@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
 import { inflateSync, deflateSync } from 'node:zlib';
-import { APP_CONFIG, getDefaultAdminConfig, type AdminConfig, type AppConfig } from '../shared/subreddit';
+import { APP_CONFIG, getDefaultAdminConfig, getSubredditLink, getSubredditNameFromUrl, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
@@ -30,8 +30,20 @@ const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | un
   const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
   if (!encoded) return undefined;
   const config = decodeConfig(encoded);
+  // Drop legacy Discord, Modmail, arbitrary external, and invalid subreddit buttons.
+  // Only canonical subreddit destinations are allowed to survive config loading.
+  const buttons = Array.isArray(config.buttons)
+    ? config.buttons
+        .filter((button) => button?.type === 'subreddit' && Boolean(getSubredditNameFromUrl(button.url)))
+        .map((button) => ({
+          ...button,
+          type: 'subreddit' as const,
+          url: getSubredditLink(getSubredditNameFromUrl(button.url)),
+        }))
+    : [];
   return {
     ...config,
+    buttons,
     assets: config.assets ?? [],
     backgroundStyle: config.backgroundStyle === 'custom' ? 'custom' : 'petals',
   };
@@ -49,7 +61,18 @@ const saveTargetPosts = async (targets: TargetPostRecord[]) =>
 const isValidAdminConfig = (value: unknown): value is AdminConfig => {
   if (!value || typeof value !== 'object') return false;
   const config = value as Partial<AdminConfig>;
-  return config.version === 1 && Array.isArray(config.buttons) && Array.isArray(config.managedSubreddits);
+  return (
+    config.version === 1 &&
+    Array.isArray(config.buttons) &&
+    config.buttons.every((button) =>
+      Boolean(
+        button &&
+        button.type === 'subreddit' &&
+        getSubredditNameFromUrl(button.url)
+      )
+    ) &&
+    Array.isArray(config.managedSubreddits)
+  );
 };
 
 const effectiveConfig = (admin?: AdminConfig): AppConfig =>
@@ -139,6 +162,11 @@ app.post('/api/admin/save', async (c) => {
 
     const config: AdminConfig = {
       ...payload.config,
+      buttons: payload.config.buttons.map((button) => ({
+        ...button,
+        type: 'subreddit',
+        url: getSubredditLink(getSubredditNameFromUrl(button.url)),
+      })),
       managedSubreddits: payload.config.managedSubreddits.map((name) => name.trim().replace(/^r\//i, '')).filter(Boolean),
     };
     const encoded = encodeConfig(config);
