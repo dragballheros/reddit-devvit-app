@@ -4,8 +4,10 @@ import { context, navigateTo } from '@devvit/web/client';
 import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   APP_CONFIG,
-  getModmailLink,
+  getSubredditAboutLink,
   getSubredditLabel,
+  getSubredditLink,
+  getSubredditNameFromUrl,
   getSubredditTitle,
   normalizeSubredditName,
 } from '../shared/subreddit';
@@ -214,7 +216,6 @@ export const MenuApp = () => {
 
   const subredditTitle = getSubredditTitle(context.subredditName);
   const subredditLabel = getSubredditLabel(context.subredditName);
-  const modmailLink = getModmailLink(context.subredditName);
   const currentSubredditName = normalizeSubredditName(context.subredditName);
 
   useEffect(() => {
@@ -232,8 +233,22 @@ export const MenuApp = () => {
   const portals = useMemo(() => {
     if (!configLoaded) return [];
 
+    const subredditMenuButton = {
+      label: 'Subreddit Menu',
+      accent: '#6ecbff',
+      backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)',
+      onClick: () => {
+        const destination = getSubredditAboutLink(context.subredditName);
+        if (destination) navigateTo(destination);
+      },
+    };
+
     const configuredButtons = (config.buttons ?? [])
-      .filter((button) => button.enabled !== false)
+      .filter((button) =>
+        button.enabled !== false &&
+        button.type === 'subreddit' &&
+        Boolean(getSubredditNameFromUrl(button.url))
+      )
       .map((button) => ({
         label: button.label,
         background: button.background,
@@ -248,14 +263,15 @@ export const MenuApp = () => {
         backgroundPositionY: button.backgroundPositionY,
         backgroundScale: button.backgroundScale,
         onClick: () => {
-          if (button.type === 'modmail') navigateTo(getModmailLink(context.subredditName));
-          else if (button.url) navigateTo(button.url);
+          const subredditName = getSubredditNameFromUrl(button.url);
+          const destination = getSubredditLink(subredditName);
+          if (destination) navigateTo(destination);
         },
       }));
 
-    if (configuredButtons.length > 0) return configuredButtons;
+    if (configuredButtons.length > 0) return [subredditMenuButton, ...configuredButtons];
 
-    return [
+    const placeholders = [
       { label: 'Subreddit 1', accent: '#b18cff', backgroundGradient: 'linear-gradient(120deg, #1b1b2f, #3d2c63, #090a12)' },
       { label: 'Subreddit 2', accent: '#6ecbff', backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)' },
       { label: 'Subreddit 3', accent: '#ff8fcf', backgroundGradient: 'linear-gradient(120deg, #35162f, #6b315b, #120914)' },
@@ -265,6 +281,8 @@ export const MenuApp = () => {
       onClick: () => {},
       disabled: true,
     }));
+
+    return [subredditMenuButton, ...placeholders];
   }, [config.buttons, configLoaded]);
 
   return (
