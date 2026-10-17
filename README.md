@@ -2,7 +2,7 @@
 
 Community Navigation is a reusable Reddit Devvit custom post intended to help members find and navigate between subreddits. Each participating community's moderators control the subreddit destinations and presentation configured for their community. The app does not decide which communities should be recommended, and ordinary members do not control a community's configuration.
 
-**This app is for Safe for Work (SFW) use only. NSFW content and destinations are not allowed.** The app and its configuration must comply with the current Devvit Rules and all other applicable Reddit policies.
+**The app is designed for community-configured subreddit navigation. Install and use it in accordance with Reddit's current Devvit Rules and applicable Reddit policies.** The app and its configuration must comply with the current Devvit Rules and all other applicable Reddit policies.
 
 ## What the app provides
 
@@ -22,8 +22,8 @@ The app is community-configured. A fresh installation has no community-specific 
 Community Navigation is a general-purpose subreddit navigation utility, not an endorsement of any particular community or an advertising tool for external platforms.
 
 - Subreddit moderators are responsible for choosing and maintaining the destinations and media configured for their community.
-- Only use the app to direct members to relevant **SFW subreddits**.
-- Do not configure NSFW subreddits or destinations, sexually explicit or otherwise mature content, or media that violates Reddit's rules.
+- Configure destinations appropriate for your community and compliant with Reddit's current policies.
+- Do not use the app to share content or destinations that violate Reddit's rules or applicable restrictions.
 - Do not use the app to promote Discord servers, other external apps, or off-platform services. If legacy destination controls are present in the current interface, do not use them; the intended use is subreddit-to-subreddit navigation only.
 - The app must not be used to evade Reddit's rules, subreddit restrictions, age-gating requirements, or other safety mechanisms.
 
@@ -45,17 +45,17 @@ The admin panel is accessed from the app's own custom-post menu. Reddit profile 
 
 In **Welcome Screen**:
 
-- Add one or more SFW welcome GIFs or images.
+- Add welcome GIFs or images that comply with Reddit's current content policies.
 - Multiple GIFs may be selected randomly when the post loads or refreshes.
 - Remove all welcome media to skip the intro and go directly to the navigation buttons.
 
-All uploaded media must be SFW and comply with Reddit's policies.
+All uploaded media must comply with Reddit's current policies and applicable content restrictions.
 
 ### 3. Configure subreddit navigation
 
 Use **+ Add Subreddit Button** to configure a destination. Each configurable button must point directly to a subreddit landing page on Reddit, such as `https://www.reddit.com/r/ExampleSubreddit/`.
 
-**Destination validation is enforced in both the admin interface and the server.** Only HTTPS URLs on `reddit.com`, `www.reddit.com`, or `old.reddit.com` with a direct `/r/SubredditName/` path are accepted. Links to other websites, Reddit posts, user profiles, and URLs with query parameters or fragments are rejected. Saved links are normalized to a canonical Reddit subreddit URL. Do not configure NSFW destinations or use misleading labels.
+**Destination validation is enforced in both the admin interface and the server.** Only HTTPS URLs on `reddit.com`, `www.reddit.com`, or `old.reddit.com` with a direct `/r/SubredditName/` path are accepted. Links to other websites, Reddit posts, user profiles, and URLs with query parameters or fragments are rejected. Saved links are normalized to a canonical Reddit subreddit URL. Ensure destinations and labels are accurate and comply with Reddit's current policies.
 
 Discord, Modmail, and arbitrary external-link button types are not supported. Legacy saved buttons of those types are ignored and are not displayed.
 
@@ -73,7 +73,7 @@ The destination opens the community's About/community-information page. Reddit m
 
 The **Asset Library** stores reusable images and GIFs uploaded through Reddit/Devvit.
 
-Use the upload controls to add SFW welcome media, button backgrounds, or icons. Existing assets can be selected again from the relevant controls.
+Use the upload controls to add welcome media, button backgrounds, or icons that comply with Reddit's current policies. Existing assets can be selected again from the relevant controls.
 
 Use **Delete** in the Asset Library to remove an asset from the app configuration. Deleting an asset also clears button references to it. Changes are persisted with **Save & Apply**.
 
@@ -81,7 +81,7 @@ Use **Delete** in the Asset Library to remove an asset from the app configuratio
 
 Click **Save & Apply**.
 
-The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the moderator must have the necessary moderation permissions there. Configure only SFW subreddit destinations.
+The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the moderator must have the necessary moderation permissions there. Configure only destinations appropriate for the community and compliant with Reddit's current policies.
 
 ### 6. Create a standalone test post
 
@@ -89,7 +89,7 @@ The moderator **Create Navigation Post** action creates a Community Navigation p
 
 ## Configuration behavior
 
-The app is intended to be reusable across SFW communities. A fresh installation has no community-specific destinations or media configured.
+The app is intended to be reusable across communities. A fresh installation has no community-specific destinations or media configured.
 
 When there are no configured subreddit destinations, the app still shows the fixed **Subreddit Menu** button, followed by four disabled placeholders:
 
@@ -104,7 +104,7 @@ These placeholders help moderators recognize where to configure subreddit destin
 
 By installing, configuring, or using Community Navigation, moderators and users are expected to follow the current Devvit Rules and all applicable Reddit Terms & Policies.
 
-**NSFW use is not permitted.** Do not add, display, link to, or promote NSFW subreddits, adult or sexually explicit content, mature media, or destinations intended for NSFW content. Do not use the app to facilitate policy violations or to bypass Reddit's safety systems.
+All use must comply with Reddit's current Devvit Rules, content policies, age-gating requirements, and other applicable restrictions. Do not use the app to facilitate policy violations or bypass Reddit's safety systems.
 
 Moderators are responsible for the destinations and media they configure. The app's general-purpose design does not guarantee that a particular configuration complies with Reddit policy, and this README does not replace the official rules. Check the official Devvit Rules regularly because they may change.
 
@@ -113,8 +113,8 @@ Moderators are responsible for the destinations and media they configure. The ap
 Before using the app in a community:
 
 1. Create the admin panel in a subreddit you moderate.
-2. Configure only SFW subreddit destinations.
-3. Add and remove SFW welcome media.
+2. Configure only destinations appropriate for the community and compliant with Reddit's current policies.
+3. Add and remove welcome media that complies with Reddit's current policies.
 4. Add, edit, and remove subreddit buttons using valid direct Reddit subreddit URLs.
 5. Confirm an external URL, Reddit post URL, or profile URL is rejected by validation.
 6. Confirm the fixed Subreddit Menu button opens the current subreddit’s `/about/` page and cannot be customized.
