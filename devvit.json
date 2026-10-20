@@ -31,7 +31,7 @@
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create the moderator configuration post in the current test subreddit.",
+        "description": "Create the owner-only configuration panel for this subreddit.",
         "location": "post",
         "forUserType": "moderator",
         "postFilter": "currentApp",

@@ -6,7 +6,7 @@ Community Navigation is a reusable Reddit Devvit custom post intended to help me
 
 ## What the app provides
 
-- A moderator-only **Community Navigation Admin** panel.
+- An owner-only **Community Navigation Admin** panel, restricted to the subreddit’s top moderator.
 - A configurable navigation page for subreddit destinations.
 - A built-in **Subreddit Menu** button that automatically opens the installed subreddit’s `/about/` page.
 - Customizable button labels and appearance, including colors, gradients, icons, and backgrounds.
@@ -37,9 +37,11 @@ Read the current [Devvit Rules](https://developers.reddit.com/docs/devvit_rules)
 
 Install or playtest the app in a subreddit you moderate.
 
-From the app's custom-post menu, choose **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one.
+From the app's custom-post menu, the subreddit’s top moderator can choose **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one. Reddit does not expose a separate “owner” role, so this app defines owner as the top moderator shown first in the live moderator list.
 
-The admin panel is accessed from the app's own custom-post menu. Reddit profile pinning is not performed automatically. Moderators can use Reddit's normal post pin controls if they want the configuration post pinned.
+The admin panel is accessed from the app's own custom-post menu. Only the current subreddit’s top moderator can create, open, read, or change the dashboard; other moderators see an explicit access-denied message. The server checks ownership on every admin endpoint, so UI visibility is not treated as a security boundary. Reddit profile pinning is not performed automatically.
+
+Each subreddit installation has its own Redis-backed configuration and admin panel. A panel in one subreddit does not grant administrative access to another community's panel. If you select a managed subreddit, the app creates or updates only its own navigation post there, after checking that the requesting user is a moderator in that target community and that the app has the required installation/permissions. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel.
 
 ### 2. Configure the welcome screen
 

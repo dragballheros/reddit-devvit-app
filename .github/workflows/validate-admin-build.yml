@@ -1,7 +1,9 @@
 name: Validate Admin Build
 on:
   push:
-    branches: [main]
+    branches: [main, communitypro, fix/community-scoped-admin-authorization-20261019]
+  pull_request:
+    branches: [main, communitypro]
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -12,5 +14,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm install
+      - run: npm run test:community-isolation
       - run: npm run type-check
       - run: npm run build
