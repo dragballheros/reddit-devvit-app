@@ -1,14 +1,17 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
+import { getDevvitConfig } from '@devvit/shared-types/server/get-devvit-config.js';
+import { SubredditsDefinition } from '@devvit/protos';
 import { inflateSync, deflateSync } from 'node:zlib';
 import { APP_CONFIG, getDefaultAdminConfig, isAdminPanelPostData, normalizeAdminConfig, normalizeManagedSubredditName, normalizeSubredditName, readOwnSubredditConfigPayload, resolveRuntimeAdminPostId, type AdminConfig, type AppConfig } from '../shared/subreddit';
+import { limitInstallationNames, planConnection, selectEligibleInstallations, TARGET_POST_CACHE_KEY, type InstallationCandidate, type StoredNavigationPost } from '../shared/installations';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
 
 const ADMIN_POST_KEY = 'community-portal:admin-post';
-const TARGET_POSTS_KEY = 'community-portal:target-posts';
+const TARGET_POSTS_KEY = TARGET_POST_CACHE_KEY;
 
 type RedditPostId = `t3_${string}`;
 
@@ -312,6 +315,154 @@ const snapshotLegacyTargets = async (sourceConfig: AdminConfig, adminPostId: Red
   return written;
 };
 
+const INSTALLATION_PAGE_LIMIT = 100;
+const INSTALLATION_PAGE_CAP = 5;
+const NAVIGATION_SCAN_LIMIT = 40;
+const PERMISSION_BATCH = 5;
+
+/**
+ * Subreddits the app account moderates. Devvit adds that account as a moderator
+ * on install, and this call runs as the app, so the list is the installations.
+ * There is no shared Redis behind it.
+ */
+const listAppModeratedSubreddits = async (): Promise<string[]> => {
+  const client = getDevvitConfig().use<{
+    SubredditsMineWhere: (
+      request: { where: string; show?: string; limit?: number; after?: string },
+      metadata?: unknown,
+    ) => Promise<{
+      data?: {
+        after?: string;
+        children?: Array<{ data?: { displayName?: string; displayNamePrefixed?: string } }>;
+      };
+    }>;
+  }>(SubredditsDefinition);
+  const names: string[] = [];
+  const seenCursors = new Set<string>();
+  let after: string | undefined;
+  for (let page = 0; page < INSTALLATION_PAGE_CAP; page += 1) {
+    const response = await client.SubredditsMineWhere({
+      where: 'moderator',
+      show: 'all',
+      limit: INSTALLATION_PAGE_LIMIT,
+      after,
+    }, context.metadata);
+    const children = response.data?.children ?? [];
+    for (const child of children) {
+      const data = child.data as { displayName?: string; displayNamePrefixed?: string; display_name?: string } | undefined;
+      const name = normalizeManagedSubredditName(data?.displayName || data?.displayNamePrefixed || data?.display_name);
+      if (name) names.push(name);
+    }
+    const next = response.data?.after;
+    if (!next || children.length === 0 || seenCursors.has(next)) break;
+    seenCursors.add(next);
+    after = next;
+  }
+  return names;
+};
+
+const listInstallationCandidates = async (homeName: string): Promise<{
+  candidates: InstallationCandidate[];
+  truncated: boolean;
+  error?: string;
+}> => {
+  let names: string[] = [];
+  try {
+    names = await listAppModeratedSubreddits();
+  } catch (error) {
+    console.error('Could not list app installations', error);
+    return {
+      candidates: [],
+      truncated: false,
+      error: 'Could not list the communities where this app is installed. No connection was offered.',
+    };
+  }
+  const limited = limitInstallationNames(names, homeName);
+  const candidates: InstallationCandidate[] = [];
+  for (let index = 0; index < limited.names.length; index += PERMISSION_BATCH) {
+    const batch = limited.names.slice(index, index + PERMISSION_BATCH);
+    const checked = await Promise.all(batch.map(async (subredditName) => ({
+      subredditName,
+      permissions: await getCurrentUserModPermissions(subredditName),
+    })));
+    candidates.push(...checked);
+  }
+  return { candidates, truncated: limited.truncated };
+};
+
+/** Newest app posts in a target community. The target installation's Redis is not read. */
+const listCandidateNavigationPosts = async (subredditName: string): Promise<StoredNavigationPost[]> => {
+  const appAuthor = context.appName?.trim().toLowerCase();
+  if (!appAuthor) return [];
+  const posts = await reddit.getNewPosts({
+    subredditName,
+    limit: NAVIGATION_SCAN_LIMIT,
+    pageSize: NAVIGATION_SCAN_LIMIT,
+  }).get(NAVIGATION_SCAN_LIMIT);
+  const records: StoredNavigationPost[] = [];
+  for (const post of posts) {
+    if (post.authorName?.trim().toLowerCase() !== appAuthor) continue;
+    if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) continue;
+    try {
+      records.push({
+        id: post.id,
+        subredditName: post.subredditName,
+        authorName: post.authorName,
+        postData: await post.getPostData(),
+      });
+    } catch (error) {
+      console.warn('Could not read a navigation post while connecting.', post.id, error);
+    }
+  }
+  return records;
+};
+
+const locateNavigationPost = async (subredditName: string, rememberedPostId?: RedditPostId) => {
+  let posts: StoredNavigationPost[] = [];
+  try {
+    posts = await listCandidateNavigationPosts(subredditName);
+  } catch (error) {
+    console.warn('Could not scan navigation posts for r/' + subredditName, error);
+  }
+  if (rememberedPostId && !posts.some((post) => post.id === rememberedPostId)) {
+    try {
+      const post = await reddit.getPostById(rememberedPostId);
+      posts.unshift({
+        id: rememberedPostId,
+        subredditName: post.subredditName,
+        authorName: post.authorName ?? '',
+        postData: await reddit.getPostData(rememberedPostId),
+      });
+    } catch (error) {
+      console.warn('Remembered navigation post is missing.', rememberedPostId, error);
+    }
+  }
+  return planConnection({
+    posts,
+    subredditName,
+    appAuthor: context.appName ?? '',
+    rememberedPostId,
+  });
+};
+
+const recoverMissingTargetPosts = async (names: string[], bySub: Map<string, TargetPostRecord>) => {
+  let changed = false;
+  for (const name of names) {
+    if (bySub.has(name)) continue;
+    try {
+      const plan = await locateNavigationPost(name);
+      if (plan.action === 'create') continue;
+      const postId = toRedditPostId(plan.postId);
+      if (!postId) continue;
+      bySub.set(name, { subredditName: name, postId });
+      changed = true;
+    } catch (error) {
+      console.warn('Could not recover the navigation post for r/' + name, error);
+    }
+  }
+  if (changed) await saveTargetPosts([...bySub.values()]);
+};
+
 const collectCommunities = async (
   homeConfig: AdminConfig,
   homeName: string,
@@ -321,6 +472,10 @@ const collectCommunities = async (
   const snapshotted = await snapshotLegacyTargets(homeConfig, adminPostId);
   const targets = await getTargetPosts();
   const bySub = new Map(targets.map((item) => [item.subredditName, item]));
+  await recoverMissingTargetPosts(
+    homeConfig.managedSubreddits.filter((name) => name !== homeName),
+    bySub,
+  );
   const names = [homeName, ...homeConfig.managedSubreddits.filter((name) => name !== homeName)];
   const communities: CommunityRecord[] = [];
 
@@ -603,6 +758,37 @@ app.post('/api/admin/save', async (c) => {
   }
 });
 
+app.get('/api/admin/installations', async (c) => {
+  try {
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
+    }
+    const homeName = normalizeManagedSubredditName(context.subredditName);
+    if (!homeName) return c.json({ installations: [], error: 'This post has no subreddit.' }, 400);
+    const stored = (await getAdminConfigFromPost(context.postId)).config;
+    const discovered = await listInstallationCandidates(homeName);
+    if (discovered.error) {
+      return c.json({ installations: [], error: discovered.error });
+    }
+    return c.json({
+      installations: selectEligibleInstallations({
+        homeSubreddit: homeName,
+        candidates: discovered.candidates,
+        connected: stored?.managedSubreddits ?? [],
+      }),
+      ...(discovered.truncated
+        ? { warning: 'Only the first 40 other installations were checked. Additional communities were not listed.' }
+        : {}),
+    });
+  } catch (error) {
+    console.error('Failed to list app installations', error);
+    return c.json({
+      installations: [],
+      error: 'Could not list the communities where this app is installed. No connection was offered.',
+    });
+  }
+});
+
 app.post('/api/admin/connect', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
@@ -614,10 +800,22 @@ app.post('/api/admin/connect', async (c) => {
     if ('error' in loadedPanel) return c.json({ error: loadedPanel.error }, loadedPanel.status);
     const { adminPostId, adminPost, homeName } = loadedPanel;
     if (!subredditName) {
-      return c.json({ error: 'Enter a subreddit name with 2–21 letters, numbers, or underscores.' }, 400);
+      return c.json({ error: 'Choose a community from the installation list.' }, 400);
     }
     if (subredditName === homeName) {
       return c.json({ error: 'This community is already in the editor. Choose it under Editing.' }, 400);
+    }
+    const discovered = await listInstallationCandidates(homeName);
+    if (discovered.error) return c.json({ error: discovered.error }, 502);
+    const eligible = selectEligibleInstallations({
+      homeSubreddit: homeName,
+      candidates: discovered.candidates,
+      connected: [],
+    });
+    if (!eligible.some((item) => item.subredditName === subredditName)) {
+      return c.json({
+        error: `r/${subredditName} is not an installation of this app where you have the Everything moderator permission. No navigation post was created.`,
+      }, 403);
     }
     if (!(await isCurrentUserEverythingModerator(subredditName))) {
       return c.json({ error: everythingPermissionError(subredditName) }, 403);
@@ -631,27 +829,10 @@ app.post('/api/admin/connect', async (c) => {
 
     const existing = await getTargetPosts();
     const bySub = new Map(existing.map((item) => [item.subredditName, item]));
-    let record = bySub.get(subredditName);
-    if (record) {
-      try {
-        const post = await reddit.getPostById(record.postId);
-        if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
-          return c.json({ error: 'Stored post belongs to a different subreddit. No changes were made.' }, 409);
-        }
-        const storedTarget = await reddit.getPostData(record.postId);
-        if (isAdminPanelPostData(storedTarget)) {
-          return c.json({ error: 'Stored post is an admin panel. No changes were made.' }, 409);
-        }
-        if (!readOwnSubredditConfigPayload(storedTarget)) {
-          await post.setPostData(postData);
-        }
-      } catch (error) {
-        console.warn('Connected navigation post is missing; creating a new one.', record.postId, error);
-        record = undefined;
-      }
-    }
-
-    if (!record) {
+    const remembered = bySub.get(subredditName);
+    const plan = await locateNavigationPost(subredditName, remembered?.postId);
+    let record = remembered;
+    if (plan.action === 'create') {
       try {
         const post = await reddit.submitCustomPost({
           subredditName,
@@ -660,15 +841,38 @@ app.post('/api/admin/connect', async (c) => {
           postData,
         });
         record = { subredditName, postId: post.id };
-        bySub.set(subredditName, record);
       } catch (error) {
         console.error('Failed to create connected navigation post', subredditName, error);
         return c.json({
           error: `The app must be installed in r/${subredditName}, and you must have the Everything moderator permission there. No navigation post was created.`,
         }, 403);
       }
+    } else {
+      const postId = toRedditPostId(plan.postId);
+      if (!postId) return c.json({ error: 'The navigation post id was not valid. No changes were made.' }, 409);
+      try {
+        const post = await reddit.getPostById(postId);
+        if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
+          return c.json({ error: 'Stored post belongs to a different subreddit. No changes were made.' }, 409);
+        }
+        const storedTarget = await reddit.getPostData(postId);
+        if (isAdminPanelPostData(storedTarget)) {
+          return c.json({ error: 'Stored post is an admin panel. No changes were made.' }, 409);
+        }
+        if (plan.action === 'update' && !readOwnSubredditConfigPayload(storedTarget)) {
+          await post.setPostData(postData);
+        }
+        record = { subredditName, postId };
+      } catch (error) {
+        console.error('Could not update the navigation post', postId, error);
+        return c.json({ error: `Could not update the navigation post in r/${subredditName}. No changes were made.` }, 502);
+      }
     }
 
+    if (!record) {
+      return c.json({ error: 'No navigation post was created. No changes were made.' }, 502);
+    }
+    bySub.set(subredditName, record);
     await saveTargetPosts([...bySub.values()]);
     if (!stored.managedSubreddits.includes(subredditName)) {
       const next = { ...stored, managedSubreddits: [...stored.managedSubreddits, subredditName] };
@@ -678,7 +882,7 @@ app.post('/api/admin/connect', async (c) => {
       }
       await adminPost.setPostData(adminData);
     }
-    return c.json({ ok: true, subredditName });
+    return c.json({ ok: true, subredditName, postId: record.postId });
   } catch (error) {
     console.error('Failed to connect subreddit', error);
     return c.json({ error: 'Failed to connect that subreddit. No changes were made.' }, 500);

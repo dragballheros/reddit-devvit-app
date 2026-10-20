@@ -13,6 +13,14 @@ import {
   readOwnSubredditConfigPayload,
   resolveRuntimeAdminPostId,
 } from '../src/shared/subreddit.ts';
+import {
+  INSTALLATION_CHECK_CAP,
+  TARGET_POST_CACHE_KEY,
+  applyConnection,
+  limitInstallationNames,
+  planConnection,
+  selectEligibleInstallations,
+} from '../src/shared/installations.ts';
 
 assert.equal(isAdminPanelPostData({ portalAdmin: true, portalConfig: 'compressed' }), true);
 assert.equal(isAdminPanelPostData({ portalAdmin: false, portalConfig: 'compressed' }), false);
@@ -103,6 +111,14 @@ assert.doesNotMatch(route('/api/admin/save'), /isCurrentUserModerator\(/, 'conne
 assert.doesNotMatch(route('/api/admin/save'), /setPostData\(\{\s*portalAdminPostId:\s*adminPostId\s*\}\)/, 'saving must not replace every target with one shared pointer');
 assert.match(route('/api/admin/connect'), /requireAdminPanelAccess\(\)/);
 assert.match(route('/api/admin/connect'), /isCurrentUserEverythingModerator\(/, 'connecting a subreddit requires Everything there');
+assert.match(route('/api/admin/connect'), /selectEligibleInstallations\(/, 'connecting recomputes the discovered installation list');
+assert.match(route('/api/admin/connect'), /locateNavigationPost\(/, 'connecting writes the target navigation post, not the target Redis');
+assert.doesNotMatch(route('/api/admin/connect'), /Enter a subreddit name/);
+assert.match(route('/api/admin/installations', 'get'), /requireAdminPanelAccess\(\)/);
+assert.match(route('/api/admin/installations', 'get'), /selectEligibleInstallations\(/);
+assert.match(server, /SubredditsMineWhere\(/);
+assert.match(server, /where: 'moderator'/);
+assert.match(server, /planConnection\(/);
 assert.match(route('/api/admin/disconnect'), /requireAdminPanelAccess\(\)/);
 assert.match(route('/api/admin/disconnect'), /isCurrentUserEverythingModerator\(/, 'disconnect refuses to drop a shared link unless the actor has Everything there');
 assert.match(route('/api/admin/paste'), /requireAdminPanelAccess\(\)/);
@@ -342,6 +358,9 @@ const adminUi = await readFile(new URL('../src/client/admin.tsx', import.meta.ur
 const menuUi = await readFile(new URL('../src/client/MenuApp.tsx', import.meta.url), 'utf8');
 assert.match(adminUi, /Connected Subreddits/);
 assert.match(adminUi, /Connect Subreddit/);
+assert.match(adminUi, /installation-list/);
+assert.doesNotMatch(adminUi, /Subreddit name, e\.g\. YourSubreddit/);
+assert.doesNotMatch(adminUi, /<input[^>]*newSubreddit/);
 assert.match(adminUi, /Copy Config/);
 assert.match(adminUi, /Paste Config/);
 assert.match(adminUi, /Replace Config/);
@@ -433,5 +452,134 @@ const devvitConfig = await readFile(new URL('../devvit.json', import.meta.url), 
 assert.doesNotMatch(devvitConfig, /"inline"\s*:/);
 assert.match(devvitConfig, /"entry": "splash.html"\s*,\s*"height": "tall"/);
 assert.match(devvitConfig, /"entry": "admin.html"\s*,\s*"height": "regular"/);
+
+const eligible = selectEligibleInstallations({
+  homeSubreddit: 'communitypro_dev',
+  connected: ['r/TestingServerAdmin'],
+  candidates: [
+    { subredditName: 'communitypro_dev', permissions: ['all'] },
+    { subredditName: 'TestingServerAdmin', permissions: ['all', 'posts'] },
+    { subredditName: 'r/TestingServerAdmin', permissions: ['all'] },
+    { subredditName: 'widgets', permissions: ['posts', 'wiki', 'config', 'mail', 'access'] },
+    { subredditName: 'secretclub', permissions: undefined },
+    { subredditName: 'not a name', permissions: ['all'] },
+    { subredditName: 'emptyperms', permissions: [] },
+  ],
+});
+assert.deepEqual(eligible, [{ subredditName: 'testingserveradmin', connected: true }]);
+
+const capped = limitInstallationNames(
+  ['communitypro_dev', 'alpha', 'alpha', 'beta', 'gamma'],
+  'communitypro_dev',
+  2,
+);
+assert.deepEqual(capped, { names: ['alpha', 'beta'], truncated: true });
+assert.equal(INSTALLATION_CHECK_CAP, 40);
+
+const appAuthor = 'communitypro';
+const encodedConfig = 'encoded-home-config';
+const source = {
+  subredditName: 'communitypro_dev',
+  redis: { [TARGET_POST_CACHE_KEY]: '[]' },
+  posts: [],
+};
+const targetRedis = { 'community-portal:admin-post': 't3_targetadmin' };
+const target = {
+  subredditName: 'testingserveradmin',
+  redis: { ...targetRedis },
+  posts: [
+    {
+      id: 't3_targetadmin',
+      subredditName: 'testingserveradmin',
+      authorName: appAuthor,
+      postData: { portalAdmin: true, portalConfig: 'target-admin' },
+    },
+    {
+      id: 't3_targetnav',
+      subredditName: 'testingserveradmin',
+      authorName: appAuthor,
+      postData: { legacy: true },
+    },
+    {
+      id: 't3_userpost',
+      subredditName: 'testingserveradmin',
+      authorName: 'someoneelse',
+      postData: {},
+    },
+  ],
+};
+const connected = applyConnection({
+  source,
+  target,
+  adminPostId: 't3_sourceadmin',
+  encodedConfig,
+  appAuthor,
+  newPostId: 't3_shouldnotcreate',
+});
+assert.equal(connected.action, 'update');
+assert.equal(connected.postId, 't3_targetnav');
+assert.deepEqual(connected.target.redis, targetRedis);
+assert.equal(connected.target.redis[TARGET_POST_CACHE_KEY], undefined);
+const targetNav = connected.target.posts.find((post) => post.id === 't3_targetnav');
+const targetAdmin = connected.target.posts.find((post) => post.id === 't3_targetadmin');
+assert.equal(readOwnSubredditConfigPayload(targetNav?.postData), encodedConfig);
+assert.equal(isAdminPanelPostData(targetAdmin?.postData), true);
+assert.equal(readOwnSubredditConfigPayload(targetAdmin?.postData), undefined);
+assert.equal(connected.target.posts.some((post) => post.id === 't3_shouldnotcreate'), false);
+const cached = JSON.parse(connected.source.redis[TARGET_POST_CACHE_KEY]);
+assert.deepEqual(cached, [{ subredditName: 'testingserveradmin', postId: 't3_targetnav' }]);
+assert.notEqual(connected.source.redis[TARGET_POST_CACHE_KEY], connected.target.redis[TARGET_POST_CACHE_KEY]);
+
+const emptyTargetRedis = {};
+const created = applyConnection({
+  source: { subredditName: 'communitypro_dev', redis: {}, posts: [] },
+  target: { subredditName: 'testingserveradmin', redis: emptyTargetRedis, posts: [] },
+  adminPostId: 't3_sourceadmin',
+  encodedConfig,
+  appAuthor,
+  newPostId: 't3_newnav',
+});
+assert.equal(created.action, 'create');
+assert.equal(created.postId, 't3_newnav');
+assert.deepEqual(created.target.redis, emptyTargetRedis);
+assert.equal(readOwnSubredditConfigPayload(created.target.posts[0]?.postData), encodedConfig);
+assert.equal(JSON.parse(created.source.redis[TARGET_POST_CACHE_KEY])[0].postId, 't3_newnav');
+
+const kept = 'encoded-existing-target';
+const reused = applyConnection({
+  source,
+  target: {
+    subredditName: 'testingserveradmin',
+    redis: { ...targetRedis },
+    posts: [
+      {
+        id: 't3_newest',
+        subredditName: 'testingserveradmin',
+        authorName: appAuthor,
+        postData: {},
+      },
+      {
+        id: 't3_configured',
+        subredditName: 'testingserveradmin',
+        authorName: appAuthor,
+        postData: { portalSubredditConfig: true, portalAdminPostId: 't3_sourceadmin', portalConfig: kept },
+      },
+    ],
+  },
+  adminPostId: 't3_sourceadmin',
+  encodedConfig: 'encoded-would-overwrite',
+  appAuthor,
+  rememberedPostId: 't3_newest',
+  newPostId: 't3_another',
+});
+assert.deepEqual(planConnection({
+  posts: target.posts,
+  subredditName: 'TestingServerAdmin',
+  appAuthor,
+}), { action: 'update', postId: 't3_targetnav' });
+assert.equal(reused.action, 'reuse');
+assert.equal(reused.postId, 't3_configured');
+assert.equal(readOwnSubredditConfigPayload(reused.target.posts.find((post) => post.id === 't3_configured')?.postData), kept);
+assert.deepEqual(reused.target.redis, targetRedis);
 
 console.log('COMMUNITY_ISOLATION_TESTS_PASS');

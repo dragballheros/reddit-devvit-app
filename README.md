@@ -63,9 +63,15 @@ More than one moderator can have Everything. They are peers. Grants are a shared
 - **Create Navigation Admin Panel** removes the previous panel, creates a blank one, and clears delegated access. It does not copy the previous buttons, media, or grants. Before the old panel is removed, connected navigation posts are given their own copy when the acting user has Everything in that subreddit. Use it to replace a panel, not to refresh one.
 - **Disconnect** removes a subreddit from this panel and keeps its navigation post. If that post still follows this community, disconnect is refused unless the acting user has Everything there, so the post is not left on a shared link. Connecting the same name again reuses the remembered post.
 
-Devvit cannot list the subreddits a user moderates or where this app is installed. The **Connected Subreddits** section therefore asks for a typed name. The server accepts it only when both checks pass: this app is installed in that subreddit, and the acting user has Everything there. A community the actor cannot change is labeled **r/{name} (Everything only)**.
+Redis is stored separately for every subreddit installation, including after an app upgrade. There is no app-wide Redis, settings store, or scheduler that two communities share. The admin panel does not read or write the other community’s Redis.
 
-Each subreddit installation has its own Redis data, canonical admin post, and grant list. An admin panel in one community cannot edit another community’s panel.
+**Connected Subreddits** discovers installations through Reddit. On install, Devvit makes the app account a moderator of that community. The server asks Reddit for the communities that account moderates, then keeps only the ones where the signed-in moderator has Everything at that moment. A permission check that fails is left off the list. There is no name field. The first 40 other installations are checked per request.
+
+Choosing **Connect Subreddit** writes this community’s saved configuration onto a navigation post in the target community. Reddit posts are readable from any installation, so this panel creates or updates that post and reads it back later. The post is the target’s copy of the configuration. This installation only remembers the post id. The target’s Redis is left alone, and its public menu reads the post. If this installation’s Redis no longer has the post id, the panel looks for the existing app navigation post in the target before creating another one. A post that already stores its own configuration is reused rather than overwritten.
+
+A community the actor cannot change is labeled **r/{name} (Everything only)**.
+
+Each subreddit installation still has its own Redis data, canonical admin post, and grant list. An admin panel in one community cannot edit another community’s panel.
 
 ## Install and playtest
 
@@ -108,7 +114,7 @@ GitHub Actions runs the isolation tests, TypeScript check, and production build 
 5. Add SFW welcome media if you want an intro.
 6. Add subreddit buttons with direct Reddit subreddit URLs.
 7. Under **Connected Subreddits**, use **Editing** to choose `r/{this community} (this community)` or another connected subreddit. Each one has its own configuration.
-8. To connect another subreddit, type its name (for example in **Subreddit name, e.g. YourSubreddit**) and choose **Connect Subreddit**. You must have Everything there, and the app must already be installed there. The new navigation post starts from this community’s saved configuration, so save unsaved work first.
+8. Under **Connected Subreddits**, other installations where you have Everything appear automatically. Choose **Connect Subreddit** beside one of them. The app must already be installed there. That community’s navigation post starts from this community’s saved configuration, so save unsaved work first. If the list fails to load, choose **Refresh list**. A failed check does not offer a name field.
 9. Choose **Copy Config** on the community you want to copy. Select the other community under **Editing**, choose **Paste Config**, then **Replace Config**. Cancel leaves the target unchanged. Pasted configurations are checked again on the server.
 10. Choose **Save & Apply to r/{name}** to publish only the community selected under **Editing**.
 11. Use **Create Navigation Post** when you want another navigation post in the current subreddit for review. That local post keeps following this community’s configuration.

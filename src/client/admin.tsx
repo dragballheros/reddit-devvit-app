@@ -11,7 +11,6 @@ import {
   getDefaultAdminConfig,
   getSubredditLink,
   getSubredditNameFromUrl,
-  normalizeManagedSubredditName,
   type AdminConfig,
   type BackgroundStyle,
   type ManagedAsset,
@@ -49,6 +48,8 @@ type AdminPayload = {
 };
 
 type CopiedConfig = { source: string; config: AdminConfig };
+type InstallationRecord = { subredditName: string; connected: boolean };
+type InstallationsPayload = { installations?: InstallationRecord[]; error?: string; warning?: string };
 
 class ApiError extends Error {
   status: number;
@@ -172,8 +173,11 @@ export const AdminApp = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [newSubreddit, setNewSubreddit] = useState('');
+  const [connectingName, setConnectingName] = useState<string | null>(null);
+  const [installations, setInstallations] = useState<InstallationRecord[]>([]);
+  const [installationsLoading, setInstallationsLoading] = useState(true);
+  const [installationError, setInstallationError] = useState<string | null>(null);
+  const [installationWarning, setInstallationWarning] = useState<string | null>(null);
   const [accessLevel, setAccessLevel] = useState<AccessLevel>('delegatedModerator');
   const [moderators, setModerators] = useState<ModeratorRosterEntry[]>([]);
   const [delegates, setDelegates] = useState<string[]>([]);
@@ -232,6 +236,7 @@ export const AdminApp = () => {
     try {
       const data = await api<AdminPayload>('/api/admin/config');
       applyLoaded(data);
+      void loadInstallations();
       if (data.canManageAccess) await refreshModeratorRoster();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load admin panel.';
@@ -246,6 +251,22 @@ export const AdminApp = () => {
   const refreshConfig = async (prefer: string) => {
     const data = await api<AdminPayload>('/api/admin/config');
     applyLoaded(data, prefer, true);
+  };
+
+  const loadInstallations = async () => {
+    setInstallationsLoading(true);
+    try {
+      const data = await api<InstallationsPayload>('/api/admin/installations');
+      setInstallations(data.installations ?? []);
+      setInstallationError(data.error ?? null);
+      setInstallationWarning(data.warning ?? null);
+    } catch (error) {
+      setInstallations([]);
+      setInstallationWarning(null);
+      setInstallationError(error instanceof Error ? error.message : 'Could not list the communities where this app is installed.');
+    } finally {
+      setInstallationsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -457,6 +478,7 @@ export const AdminApp = () => {
     }
   };
 
+  const connecting = connectingName !== null;
   const selectedCommunity = communities.find((item) => item.subredditName === selected);
   const canEditSelected = selectedCommunity?.canEdit === true;
   const canReadSelected = selectedCommunity?.canRead === true;
@@ -493,38 +515,30 @@ export const AdminApp = () => {
     }
   };
 
-  const connectSubreddit = async () => {
-    const normalized = normalizeManagedSubredditName(newSubreddit);
-    if (!normalized) {
-      showToast('Enter a subreddit name with 2–21 letters, numbers, or underscores.');
-      return;
-    }
-    if (normalized === homeSubreddit) {
-      showToast('This community is already in the editor. Choose it under Editing.');
-      return;
-    }
-    setConnecting(true);
+  const connectSubreddit = async (subredditName: string) => {
+    if (!subredditName || subredditName === homeSubreddit || connectingName) return;
+    setConnectingName(subredditName);
     try {
       await api('/api/admin/connect', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subredditName: normalized }),
+        body: JSON.stringify({ subredditName }),
       });
-      setNewSubreddit('');
-      delete drafts.current[normalized];
-      await refreshConfig(normalized);
-      showToast(`Connected r/${normalized}. A new connection starts from this community’s saved configuration.`);
+      delete drafts.current[subredditName];
+      await refreshConfig(subredditName);
+      await loadInstallations();
+      showToast(`Connected r/${subredditName}. Its navigation post keeps this community’s saved configuration.`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Could not connect that subreddit.');
     } finally {
-      setConnecting(false);
+      setConnectingName(null);
     }
   };
 
   const disconnectSubreddit = async () => {
     if (!selected || selected === homeSubreddit) return;
     const name = selected;
-    setConnecting(true);
+    setConnectingName(name);
     try {
       await api('/api/admin/disconnect', {
         method: 'POST',
@@ -533,11 +547,12 @@ export const AdminApp = () => {
       });
       delete drafts.current[name];
       await refreshConfig(homeSubreddit);
+      await loadInstallations();
       showToast(`Disconnected r/${name}. Its navigation post was kept.`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Could not disconnect that subreddit.');
     } finally {
-      setConnecting(false);
+      setConnectingName(null);
     }
   };
 
@@ -726,11 +741,37 @@ export const AdminApp = () => {
               </div>
             </div>
           )}
-          <div className="sub-add">
-            <input value={newSubreddit} onChange={(event) => setNewSubreddit(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void connectSubreddit(); }} placeholder="Subreddit name, e.g. YourSubreddit" />
-            <button type="button" className="secondary" onClick={() => void connectSubreddit()} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Subreddit'}</button>
+          <div className="installation-heading">
+            <p className="hint">Other installations of this app where you have Everything are listed here. Choose Connect Subreddit to connect one. Connecting copies this community’s saved configuration onto that community’s navigation post, so save unsaved work first.</p>
+            <button type="button" className="secondary" onClick={() => void loadInstallations()} disabled={installationsLoading || connecting}>Refresh list</button>
           </div>
-          <p className="hint">Type a subreddit name and choose Connect Subreddit. Reddit does not provide a list of communities you moderate, so the server checks the name: the app must already be installed there, and you must have the Everything moderator permission there. Connecting copies this community’s saved configuration, not unsaved edits. Save this community first if the new post should start from changes you have not saved yet.</p>
+          {installationError && <p className="validation-error" role="alert">{installationError}</p>}
+          {installationWarning && <p className="hint">{installationWarning}</p>}
+          {installationsLoading && <p className="hint">Looking for other installations…</p>}
+          {!installationsLoading && !installationError && installations.length === 0 && (
+            <p className="hint">No other installations were found where you have the Everything moderator permission.</p>
+          )}
+          {installations.length > 0 && (
+            <ul className="installation-list" id="installation-list">
+              {installations.map((installation) => (
+                <li className="installation-row" key={installation.subredditName}>
+                  <strong>r/{installation.subredditName}</strong>
+                  {installation.connected ? (
+                    <span className="owner-pill">Connected</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => void connectSubreddit(installation.subredditName)}
+                      disabled={connecting || saving}
+                    >
+                      {connectingName === installation.subredditName ? 'Connecting…' : 'Connect Subreddit'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="hint">Choose Editing to switch communities. Copy Config keeps the configuration on screen, including unsaved edits. Select another community, choose Paste Config, then Replace Config to overwrite it. Disconnect removes a community from this panel and keeps its navigation post.</p>
           {selectedCommunity?.followsHome && selected !== homeSubreddit && (
             <p className="hint">r/{selected} still shows this community’s saved configuration. Saving stores an independent copy on its navigation post.</p>
@@ -739,7 +780,7 @@ export const AdminApp = () => {
             <div className="targets"><div className="target"><span>r/{selected}</span><small>{selectedCommunity.postId}</small></div></div>
           )}
           {targets.filter((target) => !communities.some((community) => community.subredditName === target.subredditName)).length > 0 && (
-            <p className="hint">Previously connected navigation posts are remembered, so connecting the same subreddit again updates that post.</p>
+            <p className="hint">Connecting the same community again reuses its navigation post. This panel reads that post directly.</p>
           )}
         </section>
         {canReadSelected ? (
