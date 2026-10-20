@@ -165,7 +165,7 @@ const saveDelegatedAdminUsernames = async (subredditName: string, usernames: str
 /** Returns the current live moderator roster. Fail closed on API errors. */
 const getModeratorUsernames = async (subredditName: string): Promise<string[]> => {
   const subreddit = await reddit.getSubredditByName(subredditName);
-  const moderators = await subreddit.getModerators().get(1000);
+  const moderators = await subreddit.getModerators().all();
   return [...new Set(moderators
     .map((moderator) => moderator.username?.trim().toLowerCase())
     .filter((username): username is string => Boolean(username)))];
