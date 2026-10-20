@@ -44,10 +44,57 @@ export const AdminApp = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [newSubreddit, setNewSubreddit] = useState('');
+  const [accessLevel, setAccessLevel] = useState<'topModerator' | 'delegatedModerator'>('delegatedModerator');
+  const [moderators, setModerators] = useState<string[]>([]);
+  const [delegates, setDelegates] = useState<string[]>([]);
+  const [accessRefreshing, setAccessRefreshing] = useState(false);
+  const [accessSaving, setAccessSaving] = useState<string | null>(null);
+
+  const refreshModeratorRoster = async () => {
+    setAccessRefreshing(true);
+    try {
+      const data = await api<{ moderators: string[]; delegates: string[] }>('/api/admin/access');
+      setModerators(data.moderators ?? []);
+      setDelegates(data.delegates ?? []);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not scan the live moderator team.');
+    } finally {
+      setAccessRefreshing(false);
+    }
+  };
+
+  const setModeratorAccess = async (username: string, granted: boolean) => {
+    setAccessSaving(username);
+    try {
+      const data = await api<{ delegates: string[] }>('/api/admin/access', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, granted }),
+      });
+      setDelegates(data.delegates ?? []);
+      showToast(granted ? `Granted admin access to u/${username}.` : `Revoked admin access from u/${username}.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not update moderator access.');
+      // Refreshing rechecks membership so stale moderator grants are removed.
+      void refreshModeratorRoster();
+    } finally {
+      setAccessSaving(null);
+    }
+  };
 
   useEffect(() => {
-    api<{ config: AdminConfig; targets: TargetRecord[] }>('/api/admin/config')
-      .then((data) => { setConfig(data.config); setTargets(data.targets ?? []); })
+    api<{
+      config: AdminConfig;
+      targets: TargetRecord[];
+      accessLevel?: 'topModerator' | 'delegatedModerator';
+      canManageAccess?: boolean;
+    }>('/api/admin/config')
+      .then(async (data) => {
+        setConfig(data.config);
+        setTargets(data.targets ?? []);
+        setAccessLevel(data.accessLevel ?? 'delegatedModerator');
+        if (data.canManageAccess) await refreshModeratorRoster();
+      })
       .catch((error) => showToast(error instanceof Error ? error.message : 'Failed to load admin panel.'))
       .finally(() => setLoading(false));
   }, []);
@@ -239,6 +286,25 @@ export const AdminApp = () => {
     <header className="hero"><div><p className="eyebrow">Moderator Configuration</p><h1>Community Navigation Admin</h1><p className="muted">Configure the community navigation once, then apply it to multiple subreddit posts.</p></div><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply'}</button></header>
     <section className="section"><div className="section-title"><h2>Welcome Screen</h2><span>{(config.welcomeGifVariants?.length ?? (config.welcomeGif ? 1 : 0))} GIF{(config.welcomeGifVariants?.length ?? (config.welcomeGif ? 1 : 0)) === 1 ? '' : 's'}</span></div><div className="upload-row"><div className="welcome-gif-grid">{(config.welcomeGifVariants?.length ? config.welcomeGifVariants : config.welcomeGif ? [config.welcomeGif] : []).map((url, index)=><div className="welcome-gif-card" key={url + index}><img src={url} className="preview-gif" alt={`Welcome GIF ${index + 1}`}/><label className="welcome-gif-fit">Display<select value={config.welcomeGifFitByUrl?.[url] ?? 'natural'} onChange={(e)=>setConfig((c)=>({...c,welcomeGifFitByUrl:{...(c.welcomeGifFitByUrl ?? {}),[url]:e.target.value as WelcomeGifFit}}))}><option value="natural">Large / fill height</option><option value="canvas">Fit app canvas</option></select></label><button className="ghost" onClick={()=>setConfig((c)=>{const variants=(c.welcomeGifVariants?.length ? c.welcomeGifVariants : c.welcomeGif ? [c.welcomeGif] : []).filter((_,i)=>i!==index); const fits={...(c.welcomeGifFitByUrl ?? {})}; delete fits[url]; return {...c,welcomeGif:variants[0],welcomeGifVariants:variants,welcomeGifFitByUrl:fits};})}>Remove</button></div>)}{!(config.welcomeGifVariants?.length || config.welcomeGif) && <div className="empty-preview">No welcome GIF configured</div>}</div><div><button className="secondary" onClick={()=>uploadMedia('welcome')}>Add Welcome GIF</button>{(config.welcomeGifVariants?.length || config.welcomeGif)&&<button className="ghost" onClick={()=>setConfig((c)=>({...c,welcomeGif:undefined,welcomeGifVariants:[],welcomeGifFitByUrl:{}}))}>Clear Welcome GIFs</button>}<p className="hint">Add multiple GIFs. A different GIF is selected randomly each time the post loads or refreshes.</p></div></div></section>
     <section className="section"><div className="section-title"><h2>Background</h2><span>Petals or custom media</span></div><label className="background-style-select">Background type<select value={config.backgroundStyle ?? 'petals'} onChange={(e)=>setConfig((c)=>({...c,backgroundStyle:e.target.value as BackgroundStyle}))}><option value="petals">Flower Petals</option><option value="custom">Custom Background</option></select></label>{(config.backgroundStyle ?? 'petals') === 'custom' && <label className="background-style-select">Custom media<select value={config.customBackground ?? ''} onChange={(e)=>setConfig((c)=>({...c,customBackground:e.target.value||undefined,backgroundStyle:e.target.value?'custom':c.backgroundStyle}))}><option value="">Choose an image or GIF...</option>{config.assets.filter((asset)=>asset.type==='image'||asset.type==='gif').map((asset)=><option key={asset.id} value={asset.url}>{asset.name} ({asset.type.toUpperCase()})</option>)}</select></label>}<div className="background-actions"><button className="secondary" onClick={()=>uploadMedia('background')}>Add Custom Background</button>{config.customBackground&&<button className="ghost" onClick={()=>setConfig((c)=>({...c,customBackground:undefined,backgroundStyle:'petals'}))}>Clear Custom Background</button>}</div><p className="hint">Custom Background accepts either an image or an animated GIF. The same single selector controls which mode is active.</p></section>
+    {accessLevel === 'topModerator' ? <section className="section">
+      <div className="section-title"><h2>Moderator Access</h2><button className="secondary" onClick={() => void refreshModeratorRoster()} disabled={accessRefreshing}>{accessRefreshing ? 'Scanning…' : 'Scan Mod Team'}</button></div>
+      <p className="hint">Only the top moderator can grant or revoke admin access. The live moderator list is checked before every grant, and a moderator who leaves the team loses access immediately.</p>
+      <div className="moderator-access-list">
+        {moderators.map((username) => {
+          const granted = delegates.includes(username.toLowerCase());
+          return <div className="moderator-access-row" key={username}>
+            <div><strong>u/{username}</strong><small>{granted ? 'Delegated admin' : 'Moderator'}</small></div>
+            <button className={granted ? 'danger' : 'secondary'} onClick={() => void setModeratorAccess(username, !granted)} disabled={accessSaving === username || accessRefreshing}>
+              {accessSaving === username ? 'Saving…' : granted ? 'Revoke Access' : 'Grant Access'}
+            </button>
+          </div>;
+        })}
+        {moderators.length === 0 && <p className="hint">{accessRefreshing ? 'Loading Reddit moderator roster…' : 'No moderator accounts were returned. Refresh the scan before changing access.'}</p>}
+      </div>
+    </section> : <section className="section">
+      <div className="section-title"><h2>Moderator Access</h2><span>Delegated</span></div>
+      <p className="hint">Your top moderator has granted you portal access. Reddit moderator status is revalidated on each admin request. If you are removed from the moderator team, this access stops automatically.</p>
+    </section>}
     <section className="section"><div className="section-title"><h2>Managed Subreddits</h2><span>{config.managedSubreddits.length} selected</span></div><div className="sub-add"><input value={newSubreddit} onChange={(e)=>setNewSubreddit(e.target.value)} onKeyDown={(e)=>e.key==='Enter'&&addSubreddit()} placeholder="Subreddit name, e.g. YourSubreddit"/><button className="secondary" onClick={addSubreddit}>Add</button></div><div className="chips">{config.managedSubreddits.map((name)=><button key={name} className="chip" onClick={()=>setConfig((c)=>({...c,managedSubreddits:c.managedSubreddits.filter((item)=>item!==name)}))}>r/{name} ×</button>)}</div><p className="hint">The app must be installed in each selected subreddit and you must be a moderator there. Save creates missing navigation posts and updates existing managed posts. Each target post follows this admin panel's saved configuration; being a moderator in a target subreddit does not grant access to this source admin panel.</p><div className="targets">{targets.map((target)=><div key={target.postId} className="target"><span>r/{target.subredditName}</span><small>{target.postId}</small></div>)}</div></section>
     <section className="section"><div className="section-title"><h2>Asset Library</h2><span>{config.assets.length} reusable assets</span></div><div className="asset-grid">{config.assets.map((asset)=><div className="asset-card" key={asset.id}><img src={asset.url} alt="" /><div className="asset-card__info"><strong>{asset.name}</strong><small>{asset.type}</small></div><button className="danger asset-card__delete" onClick={()=>removeAsset(asset.id)}>Delete</button></div>)}{config.assets.length===0&&<div className="empty-preview">No reusable assets configured</div>}</div><p className="hint">Assets are Reddit-hosted and reusable across buttons and welcome media. Deleting an asset also clears any configuration references to it. Save & Apply to persist the change.</p></section><section className="section"><div className="section-title"><h2>Navigation Buttons</h2><button className="secondary" onClick={addButton}>+ Add Subreddit Button</button></div><p className="hint">A built-in “Community Menu” button is always shown on the public navigation post. Its destination is automatically set to this installed subreddit’s /about/ page and cannot be customized here. Configurable buttons below accept direct Reddit subreddit links only.</p><div className="buttons">{config.buttons.map((button,index)=><article className="button-card" key={button.id}><div className="button-head"><strong>{index+1}. {button.label}</strong><button className="danger" onClick={()=>removeButton(button.id)}>Remove</button></div><div className="fields"><label>Label<input value={button.label} onChange={(e)=>updateButton(button.id,{label:e.target.value})}/></label><label className="wide">Subreddit URL<input value={button.url??''} onChange={(e)=>updateButton(button.id,{url:e.target.value})} placeholder="https://www.reddit.com/r/YourSubreddit/" aria-invalid={Boolean(button.url && !getSubredditNameFromUrl(button.url))}/></label>{!button.url&&<p className="hint wide">Required. Enter a direct Reddit subreddit URL. Posts, profiles, and external links are not accepted.</p>}{Boolean(button.url && !getSubredditNameFromUrl(button.url))&&<p className="hint wide validation-error">Invalid destination. Use a direct https://www.reddit.com/r/SubredditName/ link only.</p>}<label>Accent<input value={button.accent??'#ffffff'} onChange={(e)=>updateButton(button.id,{accent:e.target.value})}/></label><label>Gradient<input value={button.backgroundGradient??''} onChange={(e)=>updateButton(button.id,{backgroundGradient:e.target.value})} placeholder="linear-gradient(...)"/></label></div><div className="media-row"><button className="secondary" onClick={()=>uploadMedia('background',button.id)}>Upload Background</button><button className="secondary" onClick={()=>uploadMedia('icon',button.id)}>Upload Icon</button><label>Existing Background<select value={button.background??''} onChange={(e)=>updateButton(button.id,{background:e.target.value||undefined})}><option value="">None</option>{config.assets.map((asset)=><option key={asset.id} value={asset.url}>{asset.name}</option>)}</select></label><label>Existing Icon<select value={button.icon??''} onChange={(e)=>updateButton(button.id,{icon:e.target.value||undefined})}><option value="">None</option>{config.assets.map((asset)=><option key={asset.id} value={asset.url}>{asset.name}</option>)}</select></label>{button.background&&<img src={button.background} className="thumb" alt=""/>}{button.icon&&<img src={button.icon} className="thumb icon-thumb" alt=""/>}</div><div className="transform"><div className="section-title"><h3>Background Fit</h3><span>Automatic cover + manual override</span></div><div className="fields"><label>Position X<input type="number" min="0" max="100" value={button.backgroundPositionX??50} onChange={(e)=>updateButton(button.id,{backgroundPositionX:Number(e.target.value)})}/></label><label>Position Y<input type="number" min="0" max="100" value={button.backgroundPositionY??50} onChange={(e)=>updateButton(button.id,{backgroundPositionY:Number(e.target.value)})}/></label><label>Scale<input type="number" min="0.5" max="3" step="0.05" value={button.backgroundScale??1} onChange={(e)=>updateButton(button.id,{backgroundScale:Number(e.target.value)})}/></label></div><BackgroundEditor button={button} onChange={(patch) => updateButton(button.id, patch)} /><p className="hint">The button frame stays fixed. X/Y move the image inside it and Scale resizes the background.</p></div></article>)}</div></section>
     <footer className="footer"><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply to Existing Posts'}</button><p>The three-dot Create Navigation Post remains separate for review/testing and creates an independent post.</p></footer>
