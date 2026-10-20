@@ -63,9 +63,16 @@ for (const path of [
   '/api/admin/upload-asset',
 ]) {
   const method = path === '/api/admin/config' ? 'get' : 'post';
-  assert.match(route(path, method), /requireAdminPanelModerator\(\)/, `${path} must require a valid admin panel and a subreddit moderator`);
+  assert.match(route(path, method), /requireAdminPanelAccess\(\)/, `${path} must require the canonical admin panel and top-moderator/delegate authorization`);
 }
 assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'custom-post menu endpoint must authorize the caller server-side');
+assert.match(route('/api/admin/access', 'get'), /requireAdminPanelOwner\(\)/, 'only the top moderator may scan the moderator roster');
+assert.match(route('/api/admin/access'), /requireAdminPanelOwner\(\)/, 'only the top moderator may grant or revoke access');
+assert.match(server, /getModerators\(\)\.get\(1000\)/, 'delegation must be based on a live moderator-team scan');
+assert.match(server, /getDelegatedAdminUsernames\(subredditName\)/, 'admin access must consult the subreddit-scoped delegation list');
+assert.match(server, /await isCurrentUserModerator\(subredditName\)/, 'delegated access must revalidate live moderator status on every admin request');
+assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the top moderator may create or replace the admin panel');
+
 assert.match(route('/api/runtime-config', 'get'), /resolveRuntimeAdminPostId\(/, 'public posts must resolve their explicit source admin pointer');
 assert.match(server, /normalizeSubredditName\(post\.subredditName\)/, 'managed-post updates must verify the target subreddit');
 console.log('COMMUNITY_ISOLATION_TESTS_PASS');
