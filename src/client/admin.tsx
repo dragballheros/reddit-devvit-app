@@ -42,13 +42,20 @@ export const AdminApp = () => {
   const [config, setConfig] = useState<AdminConfig>(cloneDefault());
   const [targets, setTargets] = useState<TargetRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newSubreddit, setNewSubreddit] = useState('');
 
   useEffect(() => {
     api<{ config: AdminConfig; targets: TargetRecord[] }>('/api/admin/config')
       .then((data) => { setConfig(data.config); setTargets(data.targets ?? []); })
-      .catch((error) => showToast(error instanceof Error ? error.message : 'Failed to load admin panel.'))
+      .catch((error) => {
+        const message = error instanceof Error
+          ? error.message
+          : 'Access denied. Only this subreddit’s owner (top moderator) can use the dashboard.';
+        setAccessDenied(message);
+        showToast(message);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -233,10 +240,15 @@ export const AdminApp = () => {
 
   const removeButton = (id: string) => setConfig((current) => ({ ...current, buttons: current.buttons.filter((button) => button.id !== id) }));
 
-  if (loading) return <main className="admin"><div className="panel"><h1>Community Navigation Admin</h1><p>Loading configuration…</p></div></main>;
+  if (loading) return <main className="admin"><div className="panel"><h1>Community Navigation Admin</h1><p>Verifying subreddit owner access…</p></div></main>;
+
+  if (accessDenied) return <main className="admin"><div className="panel">
+    <header className="hero"><div><p className="eyebrow">Access restricted</p><h1>Owner access required</h1><p className="muted">Only the top moderator of this subreddit can open or change this dashboard. Being a moderator in another subreddit does not grant access here.</p></div></header>
+    <section className="section"><h2>Dashboard unavailable</h2><p className="validation-error" role="alert">{accessDenied}</p><p className="hint">If you believe you are the top moderator, refresh this post and try again. Access is checked on the server for every admin action.</p></section>
+  </div></main>;
 
   return <main className="admin"><div className="panel">
-    <header className="hero"><div><p className="eyebrow">Moderator Configuration</p><h1>Community Navigation Admin</h1><p className="muted">Configure the community navigation once, then apply it to multiple subreddit posts.</p></div><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply'}</button></header>
+    <header className="hero"><div><p className="eyebrow">Subreddit Owner Dashboard</p><h1>Community Navigation Admin</h1><p className="muted">Only this subreddit’s top moderator can configure navigation and apply changes to eligible communities.</p></div><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply'}</button></header>
     <section className="section"><div className="section-title"><h2>Welcome Screen</h2><span>{(config.welcomeGifVariants?.length ?? (config.welcomeGif ? 1 : 0))} GIF{(config.welcomeGifVariants?.length ?? (config.welcomeGif ? 1 : 0)) === 1 ? '' : 's'}</span></div><div className="upload-row"><div className="welcome-gif-grid">{(config.welcomeGifVariants?.length ? config.welcomeGifVariants : config.welcomeGif ? [config.welcomeGif] : []).map((url, index)=><div className="welcome-gif-card" key={url + index}><img src={url} className="preview-gif" alt={`Welcome GIF ${index + 1}`}/><label className="welcome-gif-fit">Display<select value={config.welcomeGifFitByUrl?.[url] ?? 'natural'} onChange={(e)=>setConfig((c)=>({...c,welcomeGifFitByUrl:{...(c.welcomeGifFitByUrl ?? {}),[url]:e.target.value as WelcomeGifFit}}))}><option value="natural">Large / fill height</option><option value="canvas">Fit app canvas</option></select></label><button className="ghost" onClick={()=>setConfig((c)=>{const variants=(c.welcomeGifVariants?.length ? c.welcomeGifVariants : c.welcomeGif ? [c.welcomeGif] : []).filter((_,i)=>i!==index); const fits={...(c.welcomeGifFitByUrl ?? {})}; delete fits[url]; return {...c,welcomeGif:variants[0],welcomeGifVariants:variants,welcomeGifFitByUrl:fits};})}>Remove</button></div>)}{!(config.welcomeGifVariants?.length || config.welcomeGif) && <div className="empty-preview">No welcome GIF configured</div>}</div><div><button className="secondary" onClick={()=>uploadMedia('welcome')}>Add Welcome GIF</button>{(config.welcomeGifVariants?.length || config.welcomeGif)&&<button className="ghost" onClick={()=>setConfig((c)=>({...c,welcomeGif:undefined,welcomeGifVariants:[],welcomeGifFitByUrl:{}}))}>Clear Welcome GIFs</button>}<p className="hint">Add multiple GIFs. A different GIF is selected randomly each time the post loads or refreshes.</p></div></div></section>
     <section className="section"><div className="section-title"><h2>Background</h2><span>Petals or custom media</span></div><label className="background-style-select">Background type<select value={config.backgroundStyle ?? 'petals'} onChange={(e)=>setConfig((c)=>({...c,backgroundStyle:e.target.value as BackgroundStyle}))}><option value="petals">Flower Petals</option><option value="custom">Custom Background</option></select></label>{(config.backgroundStyle ?? 'petals') === 'custom' && <label className="background-style-select">Custom media<select value={config.customBackground ?? ''} onChange={(e)=>setConfig((c)=>({...c,customBackground:e.target.value||undefined,backgroundStyle:e.target.value?'custom':c.backgroundStyle}))}><option value="">Choose an image or GIF...</option>{config.assets.filter((asset)=>asset.type==='image'||asset.type==='gif').map((asset)=><option key={asset.id} value={asset.url}>{asset.name} ({asset.type.toUpperCase()})</option>)}</select></label>}<div className="background-actions"><button className="secondary" onClick={()=>uploadMedia('background')}>Add Custom Background</button>{config.customBackground&&<button className="ghost" onClick={()=>setConfig((c)=>({...c,customBackground:undefined,backgroundStyle:'petals'}))}>Clear Custom Background</button>}</div><p className="hint">Custom Background accepts either an image or an animated GIF. The same single selector controls which mode is active.</p></section>
     <section className="section"><div className="section-title"><h2>Managed Subreddits</h2><span>{config.managedSubreddits.length} selected</span></div><div className="sub-add"><input value={newSubreddit} onChange={(e)=>setNewSubreddit(e.target.value)} onKeyDown={(e)=>e.key==='Enter'&&addSubreddit()} placeholder="Subreddit name, e.g. YourSubreddit"/><button className="secondary" onClick={addSubreddit}>Add</button></div><div className="chips">{config.managedSubreddits.map((name)=><button key={name} className="chip" onClick={()=>setConfig((c)=>({...c,managedSubreddits:c.managedSubreddits.filter((item)=>item!==name)}))}>r/{name} ×</button>)}</div><p className="hint">The app must be installed in each selected subreddit and you must be a moderator there. Save creates missing navigation posts and updates existing managed posts. Each target post follows this admin panel's saved configuration; being a moderator in a target subreddit does not grant access to this source admin panel.</p><div className="targets">{targets.map((target)=><div key={target.postId} className="target"><span>r/{target.subredditName}</span><small>{target.postId}</small></div>)}</div></section>
