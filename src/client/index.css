@@ -261,17 +261,13 @@ button { font: inherit; }
   border-radius: 24px;
 }
 
-.app--expanded .menu__content {
+.app--expanded .portal-grid {
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
   overscroll-behavior: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-}
-
-.app--expanded .portal-grid {
-  overflow: visible;
-  touch-action: manipulation;
 }
 
 .portal-grid::-webkit-scrollbar { display: none; }
@@ -1015,118 +1011,4 @@ button { font: inherit; }
     background: color-mix(in srgb, var(--portal-accent) 88%, white);
     box-shadow: 0 0 12px color-mix(in srgb, var(--portal-accent) 40%, transparent);
   }
-}
-
-.app--profile .menu__content {
-  width: min(460px, calc(100% - 28px));
-  margin-inline: auto;
-  padding-top: 32px;
-  justify-content: flex-start;
-  gap: 16px;
-}
-
-.app--profile .menu__background-layer {
-  position: fixed;
-  inset: 0;
-  border-radius: 0;
-}
-
-.app--profile .menu__overlay {
-  background: rgba(0, 0, 0, var(--profile-dim, 0.42));
-}
-
-.app--bg-blur .menu__background-layer {
-  filter: blur(18px);
-  transform: scale(1.08);
-}
-
-.app--profile .portal-grid {
-  background: transparent;
-  padding: 0;
-  gap: 12px;
-  flex: 0 0 auto;
-}
-
-.app--profile .portal-button,
-.app--inline .portal-button {
-  border-radius: 16px;
-}
-
-.app--profile .portal-button {
-  min-height: 64px;
-  flex-basis: 64px;
-}
-
-.profile-card {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 22px 18px 16px;
-  border-radius: 28px;
-  text-align: center;
-}
-
-.app--card-glass .profile-card {
-  background: rgba(8, 10, 18, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
-}
-
-.app--card-solid .profile-card {
-  background: rgba(12, 14, 22, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.profile-card__avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: white;
-  background: linear-gradient(140deg, #6ecbff, #8d6bff 55%, #ff5ca8);
-  box-shadow: 0 0 24px rgba(141, 107, 255, 0.4);
-}
-
-.profile-card__hello,
-.profile-card__tagline {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.profile-card__tagline {
-  max-width: 34ch;
-  line-height: 1.45;
-  font-size: 0.92rem;
-}
-
-.app--profile .menu__title {
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
-}
-
-.audio-toggle {
-  margin-top: 4px;
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-weight: 800;
-  color: white;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-}
-
-.app--inline .carousel {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(6, 8, 16, 0.35);
-  border-radius: 22px;
-  padding: 8px;
-}
-
-.app--inline .menu__header {
-  text-align: center;
 }

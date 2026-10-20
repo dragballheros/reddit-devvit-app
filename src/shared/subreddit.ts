@@ -23,7 +23,6 @@ export type ManagedButton = {
 export type ManagedAsset = { id: string; name: string; url: string; type: 'image' | 'gif' };
 
 export type WelcomeGifFit = 'blurred' | 'side' | 'band' | 'natural' | 'canvas';
-export type CardStyle = 'glass' | 'solid';
 
 export const WELCOME_GIF_FITS = [
   { id: 'blurred', label: 'Blurred fill' },
@@ -31,11 +30,6 @@ export const WELCOME_GIF_FITS = [
   { id: 'band', label: 'Top/bottom blur' },
   { id: 'natural', label: 'Large / fill height' },
   { id: 'canvas', label: 'Fit app canvas' },
-] as const;
-
-export const CARD_STYLES = [
-  { id: 'glass', label: 'Glass' },
-  { id: 'solid', label: 'Solid' },
 ] as const;
 
 /** Portrait media gets side bars; widescreen media gets bars above and below. */
@@ -61,11 +55,6 @@ export type AdminConfig = {
   welcomeGifFitByUrl?: Record<string, WelcomeGifFit>;
   backgroundStyle?: BackgroundStyle;
   customBackground?: string;
-  backgroundDim?: number;
-  backgroundBlur?: boolean;
-  cardStyle?: CardStyle;
-  tagline?: string;
-  audioUrl?: string;
   buttons: ManagedButton[];
   managedSubreddits: string[];
   assets: ManagedAsset[];
@@ -78,11 +67,6 @@ export type AppConfig = {
   welcomeGifFitByUrl?: Record<string, WelcomeGifFit>;
   backgroundStyle?: BackgroundStyle;
   customBackground?: string;
-  backgroundDim?: number;
-  backgroundBlur?: boolean;
-  cardStyle?: CardStyle;
-  tagline?: string;
-  audioUrl?: string;
   buttons?: ManagedButton[];
 };
 
@@ -92,7 +76,6 @@ export const APP_CONFIG: AppConfig = {
 
 export const BUTTON_LABEL_MAX = 48;
 export const ASSET_NAME_MAX = 60;
-export const TAGLINE_MAX = 140;
 
 export const LABEL_FONTS = [
   { id: 'sans', label: 'Sans', value: 'Inter, ui-sans-serif, system-ui, sans-serif' },
@@ -236,10 +219,6 @@ export const getDefaultAdminConfig = (): AdminConfig => ({
   welcomeGifFitByUrl: {},
   backgroundStyle: 'petals',
   customBackground: undefined,
-  backgroundDim: 42,
-  backgroundBlur: false,
-  cardStyle: 'glass',
-  tagline: undefined,
   managedSubreddits: [],
   assets: [],
   buttons: [],
@@ -248,17 +227,6 @@ export const getDefaultAdminConfig = (): AdminConfig => ({
 const REDDIT_MEDIA_HOST = /^(?:[a-z0-9-]+\.)*(?:redd\.it|redditmedia\.com|redditstatic\.com)$/i;
 
 /** Reddit media uploads are served from Reddit-owned hosts. External URLs are rejected. */
-const AUDIO_EXTENSION = /\.(?:mp3|ogg|wav|m4a|aac)$/i;
-
-export const isRedditHostedAudioUrl = (value: unknown): value is string => {
-  if (!isRedditHostedMediaUrl(value)) return false;
-  try {
-    return AUDIO_EXTENSION.test(new URL(value).pathname);
-  } catch {
-    return false;
-  }
-};
-
 export const isRedditHostedMediaUrl = (value: unknown): value is string => {
   if (typeof value !== 'string' || value.length === 0 || value.length > 500 || /["'()\\\s]/.test(value)) return false;
   try {
@@ -491,51 +459,6 @@ export const normalizeAdminConfig = (value: unknown, mode: 'strict' | 'coerce'):
     warnings.push(message);
   }
 
-  let backgroundDim = 42;
-  if (typeof raw.backgroundDim === 'number' && Number.isFinite(raw.backgroundDim)) {
-    backgroundDim = Math.round(Math.min(80, Math.max(0, raw.backgroundDim)));
-  } else if (raw.backgroundDim != null) {
-    const message = 'Background dim must be a number from 0 to 80.';
-    if (mode === 'strict') return { ok: false, error: message };
-    warnings.push(message);
-  }
-
-  if (raw.backgroundBlur != null && typeof raw.backgroundBlur !== 'boolean') {
-    const message = 'Background blur must be on or off.';
-    if (mode === 'strict') return { ok: false, error: message };
-    warnings.push(message);
-  }
-
-  let cardStyle: CardStyle = 'glass';
-  const rawCard = (raw as { cardStyle?: unknown }).cardStyle;
-  if (rawCard == null || rawCard === '' || rawCard === 'glass') cardStyle = 'glass';
-  else if (rawCard === 'solid') cardStyle = 'solid';
-  else {
-    const message = 'Card style must be Glass or Solid.';
-    if (mode === 'strict') return { ok: false, error: message };
-    warnings.push(message);
-  }
-
-  let tagline: string | undefined;
-  if (typeof raw.tagline === 'string' && raw.tagline.trim()) {
-    tagline = sanitizeText(raw.tagline, TAGLINE_MAX);
-    if (!tagline) {
-      const message = `Tagline must be ${TAGLINE_MAX} characters or fewer.`;
-      if (mode === 'strict') return { ok: false, error: message };
-      warnings.push(message);
-    }
-  }
-
-  let audioUrl: string | undefined;
-  if (raw.audioUrl != null && raw.audioUrl !== '') {
-    if (isRedditHostedAudioUrl(raw.audioUrl)) audioUrl = raw.audioUrl;
-    else {
-      const message = 'Background audio must be an MP3, OGG, WAV, M4A, or AAC file hosted by Reddit.';
-      if (mode === 'strict') return { ok: false, error: message };
-      warnings.push(message);
-    }
-  }
-
   const customBackground = optionalMedia(raw.customBackground, 'Custom background', mode, warnings);
   if (customBackground === null) {
     return { ok: false, error: 'The custom background is not hosted by Reddit.' };
@@ -551,11 +474,6 @@ export const normalizeAdminConfig = (value: unknown, mode: 'strict' | 'coerce'):
       welcomeGifFitByUrl,
       backgroundStyle: raw.backgroundStyle === 'custom' ? 'custom' : 'petals',
       customBackground,
-      backgroundDim,
-      backgroundBlur: raw.backgroundBlur === true,
-      cardStyle,
-      tagline,
-      audioUrl,
       buttons,
       managedSubreddits,
       assets,

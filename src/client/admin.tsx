@@ -4,12 +4,10 @@ import { createRoot } from 'react-dom/client';
 import './admin.css';
 import {
   BUTTON_LABEL_MAX,
-  CARD_STYLES,
   LABEL_FONTS,
   LABEL_SIZES,
   LABEL_WEIGHTS,
   OUTLINE_STYLES,
-  TAGLINE_MAX,
   getDefaultAdminConfig,
   getSubredditLink,
   getSubredditNameFromUrl,
@@ -20,7 +18,6 @@ import {
   type ManagedButton,
   WELCOME_GIF_FITS,
   welcomeFitForAspect,
-  type CardStyle,
   type WelcomeGifFit,
 } from '../shared/subreddit';
 import { useWebViewMode } from './useWebViewMode';
@@ -823,25 +820,6 @@ export const AdminApp = () => {
             )}
           </div>
           <p className="hint">Custom backgrounds use Reddit-hosted images or GIFs. Devvit 0.14 accepts PNG, JPEG, WEBP, and GIF up to 20 MB, with a 30-second upload. MP4 and WebM are not accepted. Export a moving background as a GIF under 20 MB; files near 10 MB can fail on a slow connection. Animated WEBP may be saved as a still JPEG.</p>
-          <label className="background-style-select">Card
-            <select value={config.cardStyle ?? 'glass'} onChange={(event) => setConfig((current) => ({ ...current, cardStyle: event.target.value as CardStyle }))}>
-              {CARD_STYLES.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}
-            </select>
-          </label>
-          <label className="background-style-select">Background dim ({config.backgroundDim ?? 42})
-            <input type="range" min="0" max="80" value={config.backgroundDim ?? 42} onChange={(event) => setConfig((current) => ({ ...current, backgroundDim: Number(event.target.value) }))} />
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={config.backgroundBlur === true} onChange={(event) => setConfig((current) => ({ ...current, backgroundBlur: event.target.checked }))} />
-            Blur the full-bleed background
-          </label>
-          <label className="background-style-select">Tagline
-            <input maxLength={TAGLINE_MAX} value={config.tagline ?? ''} onChange={(event) => setConfig((current) => ({ ...current, tagline: event.target.value }))} placeholder="A short line under the community name" />
-          </label>
-          <label className="background-style-select">Background audio URL
-            <input value={config.audioUrl ?? ''} onChange={(event) => setConfig((current) => ({ ...current, audioUrl: event.target.value || undefined }))} placeholder="https://i.redd.it/theme.mp3" />
-          </label>
-          <p className="hint">Devvit 0.14 cannot upload audio. media.upload accepts PNG, JPEG, WEBP, and GIF only. If you already have a Reddit-hosted MP3, OGG, WAV, M4A, or AAC URL, paste it here. Sound stays off until a member taps Play audio in the expanded post. It pauses when the post leaves the screen. There is no autoplay.</p>
         </section>
         <section className="section">
           <div className="section-title"><h2>Asset Library</h2><span>{config.assets.length} reusable assets</span></div>

@@ -1,7 +1,7 @@
 import './index.css';
 
 import { context, navigateTo, requestExpandedMode } from '@devvit/web/client';
-import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useWebViewMode } from './useWebViewMode';
 import {
   APP_CONFIG,
@@ -217,8 +217,6 @@ export const MenuApp = () => {
   const [config, setConfig] = useState(APP_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [page, setPage] = useState(0);
-  const [audioOn, setAudioOn] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
   const isMobile = useIsMobile();
   const isAndroid = context?.client?.name === 'ANDROID';
 
@@ -257,42 +255,6 @@ export const MenuApp = () => {
 
   const subredditTitle = getSubredditTitle(context?.subredditName);
   const subredditLabel = getSubredditLabel(context?.subredditName);
-
-  useEffect(() => {
-    const stop = () => {
-      const audio = audioRef.current;
-      if (audio) {
-        audio.pause();
-        audio.muted = true;
-      }
-      setAudioOn(false);
-    };
-    const onVisibility = () => {
-      if (document.visibilityState !== 'visible') stop();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      stop();
-    };
-  }, [config.audioUrl]);
-
-  const toggleAudio = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audioOn) {
-      audio.pause();
-      audio.muted = true;
-      setAudioOn(false);
-      return;
-    }
-    audio.muted = false;
-    void audio.play().then(() => setAudioOn(true)).catch(() => {
-      audio.pause();
-      audio.muted = true;
-      setAudioOn(false);
-    });
-  };
 
   useEffect(() => {
     if (!hasWelcomeGif) {
@@ -458,30 +420,16 @@ export const MenuApp = () => {
 
   return (
     <AppErrorBoundary>
-      <div
-        className={`app app--expanded app--profile ${config.cardStyle === 'solid' ? 'app--card-solid' : 'app--card-glass'} ${config.backgroundBlur ? 'app--bg-blur' : ''} ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}
-        style={{ '--profile-dim': String((config.backgroundDim ?? 42) / 100) } as React.CSSProperties}
-      >
+      <div className={`app app--expanded ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
       <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
         <div className="menu__overlay" />
         <div className="menu__content">
           <div className={`menu__background-layer menu__background-layer--${config.backgroundStyle ?? 'petals'}`} aria-hidden="true">
             {menuBackground}
           </div>
-          <header className="profile-card">
-            <div className="profile-card__avatar" aria-hidden="true">{subredditLabel.slice(0, 1)}</div>
+          <header className="menu__header">
             <p className="menu__eyebrow">{subredditLabel}</p>
-            <h1 className="menu__title">{subredditTitle}</h1>
-            <p className="profile-card__hello">Welcome {context?.username ?? 'traveler'}</p>
-            {config.tagline && <p className="profile-card__tagline">{config.tagline}</p>}
-            {config.audioUrl && (
-              <>
-                <audio ref={audioRef} src={config.audioUrl} preload="none" loop playsInline muted />
-                <button type="button" className="audio-toggle" aria-pressed={audioOn} onClick={toggleAudio}>
-                  {audioOn ? 'Mute audio' : 'Play audio'}
-                </button>
-              </>
-            )}
+            <h1 className="menu__title">Welcome {context?.username ?? 'traveler'}</h1>
           </header>
 
           <div className="portal-grid" aria-label="Community navigation">

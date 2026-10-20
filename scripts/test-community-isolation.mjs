@@ -5,7 +5,6 @@ import {
   getSubredditLink,
   getSubredditNameFromUrl,
   isAdminPanelPostData,
-  isRedditHostedAudioUrl,
   isRedditHostedMediaUrl,
   normalizeAdminConfig,
   welcomeFitForAspect,
@@ -306,83 +305,31 @@ const bandFit = normalizeAdminConfig({
 assert.equal(bandFit.ok, true);
 if (bandFit.ok) assert.equal(bandFit.config.welcomeGifFitByUrl[welcomeUrl], 'band');
 
-const audioUrl = 'https://i.redd.it/theme.mp3';
-assert.equal(isRedditHostedAudioUrl(audioUrl), true);
-assert.equal(isRedditHostedAudioUrl('https://i.redd.it/theme.MP3'), true);
-assert.equal(isRedditHostedAudioUrl('https://preview.redd.it/clip.ogg'), true);
-assert.equal(isRedditHostedAudioUrl('https://i.redd.it/theme.wav'), true);
-assert.equal(isRedditHostedAudioUrl('https://i.redd.it/theme.m4a'), true);
-assert.equal(isRedditHostedAudioUrl('https://i.redd.it/theme.aac'), true);
-assert.equal(isRedditHostedAudioUrl('https://example.com/theme.mp3'), false);
-assert.equal(isRedditHostedAudioUrl('https://i.redd.it/theme.mp4'), false);
-assert.equal(isRedditHostedAudioUrl('https://i.redd.it/theme.gif'), false);
-assert.equal(isRedditHostedAudioUrl('http://i.redd.it/theme.mp3'), false);
-
-const profileConfig = normalizeAdminConfig({
-  version: 1,
-  buttons: [],
-  managedSubreddits: [],
-  assets: [],
-  cardStyle: 'solid',
-  backgroundDim: 90,
-  backgroundBlur: true,
-  tagline: 'A short community line',
-  audioUrl,
-}, 'strict');
-assert.equal(profileConfig.ok, true);
-if (profileConfig.ok) {
-  assert.equal(profileConfig.config.cardStyle, 'solid');
-  assert.equal(profileConfig.config.backgroundDim, 80);
-  assert.equal(profileConfig.config.backgroundBlur, true);
-  assert.equal(profileConfig.config.tagline, 'A short community line');
-  assert.equal(profileConfig.config.audioUrl, audioUrl);
-}
-
-const rejectedAudio = normalizeAdminConfig({
-  version: 1,
-  buttons: [],
-  managedSubreddits: [],
-  assets: [],
-  audioUrl: 'https://example.com/theme.mp3',
-}, 'strict');
-assert.equal(rejectedAudio.ok, false);
-
-const coercedAudio = normalizeAdminConfig({
-  version: 1,
-  buttons: [],
-  managedSubreddits: [],
-  assets: [],
-  audioUrl: 'https://example.com/theme.mp3',
-}, 'coerce');
-assert.equal(coercedAudio.ok, true);
-if (coercedAudio.ok) assert.equal(coercedAudio.config.audioUrl, undefined);
-
-const rejectedTagline = normalizeAdminConfig({
-  version: 1,
-  buttons: [],
-  managedSubreddits: [],
-  assets: [],
-  tagline: 'x'.repeat(141),
-}, 'strict');
-assert.equal(rejectedTagline.ok, false);
-
-const rejectedCard = normalizeAdminConfig({
-  version: 1,
-  buttons: [],
-  managedSubreddits: [],
-  assets: [],
+const removedFields = {
   cardStyle: 'neon',
-}, 'strict');
-assert.equal(rejectedCard.ok, false);
-
-const rejectedDim = normalizeAdminConfig({
-  version: 1,
-  buttons: [],
-  managedSubreddits: [],
-  assets: [],
   backgroundDim: 'loud',
-}, 'strict');
-assert.equal(rejectedDim.ok, false);
+  backgroundBlur: 'yes',
+  tagline: 'x'.repeat(400),
+  audioUrl: 'https://example.com/theme.mp3',
+};
+for (const mode of ['strict', 'coerce']) {
+  const legacy = normalizeAdminConfig({
+    version: 1,
+    buttons: [validButton],
+    managedSubreddits: [],
+    assets: [],
+    ...removedFields,
+  }, mode);
+  assert.equal(legacy.ok, true, mode);
+  if (legacy.ok) {
+    assert.equal('cardStyle' in legacy.config, false);
+    assert.equal('backgroundDim' in legacy.config, false);
+    assert.equal('backgroundBlur' in legacy.config, false);
+    assert.equal('tagline' in legacy.config, false);
+    assert.equal('audioUrl' in legacy.config, false);
+    assert.equal(legacy.config.buttons.length, 1);
+  }
+}
 
 const adminUi = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
 const menuUi = await readFile(new URL('../src/client/MenuApp.tsx', import.meta.url), 'utf8');
@@ -408,14 +355,12 @@ assert.match(sharedUi, /label: 'Blurred fill'/);
 assert.match(sharedUi, /label: 'Side blur'/);
 assert.match(sharedUi, /label: 'Top\/bottom blur'/);
 assert.match(sharedUi, /welcomeFitForAspect/);
-assert.match(sharedUi, /Background audio must be an MP3, OGG, WAV, M4A, or AAC file hosted by Reddit/);
+assert.doesNotMatch(sharedUi, /audioUrl|cardStyle|backgroundDim|tagline/);
 assert.match(adminUi, /WELCOME_GIF_FITS\.map/);
 assert.match(adminUi, /Side blur/);
 assert.match(adminUi, /Top\/bottom blur/);
 assert.match(adminUi, /MP4 and WebM are not accepted/);
-assert.match(adminUi, /Background audio URL/);
-assert.match(adminUi, /cannot upload audio/);
-assert.match(adminUi, /CARD_STYLES\.map/);
+assert.doesNotMatch(adminUi, /Background audio URL|Play audio|CARD_STYLES|Blur the full-bleed background/);
 assert.match(menuUi, /intro__fill/);
 assert.match(menuUi, /\?\? 'blurred'/);
 assert.match(adminUi, /Admin access required/);
@@ -447,15 +392,9 @@ assert.doesNotMatch(menuCss, /\.intro__media--contained \{[^}]*filter:\s*blur\(/
 assert.match(menuCss, /\.intro__frame--side \.intro__media--contained/);
 assert.match(menuCss, /\.intro__frame--band \.intro__media--contained/);
 assert.match(menuUi, /intro__frame--\$\{blurModifier\}/);
-assert.match(menuUi, /Play audio/);
-assert.match(menuUi, /Mute audio/);
-assert.match(menuUi, /visibilitychange/);
-assert.match(menuUi, /preload="none"/);
-assert.match(menuUi, /<audio[^>]*muted/);
-assert.doesNotMatch(menuUi, /autoplay/);
-const inlineBranch = menuUi.slice(menuUi.indexOf("if (mode === 'inline')"), menuUi.indexOf('app app--expanded'));
-assert.doesNotMatch(inlineBranch, /<audio/);
-assert.doesNotMatch(inlineBranch, /Play audio/);
+assert.match(menuUi, /app app--expanded /);
+assert.doesNotMatch(menuUi, /Play audio|Mute audio|<audio|profile-card|app--profile/);
+assert.doesNotMatch(menuCss, /profile-card|audio-toggle|app--profile|app--card-glass/);
 const adminCss = await readFile(new URL('../src/client/admin.css', import.meta.url), 'utf8');
 assert.match(adminCss, /\.admin--inline\{[^}]*overflow:\s*hidden/);
 const webViewMode = await readFile(new URL('../src/client/useWebViewMode.ts', import.meta.url), 'utf8');
