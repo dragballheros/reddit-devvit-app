@@ -331,8 +331,8 @@ app.get('/api/moderator-status', async (c) => {
 
 app.post('/api/admin/save', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ config: AdminConfig }>();
     if (!isValidAdminConfig(payload.config)) return c.json({ error: 'Invalid admin configuration.' }, 400);
@@ -454,8 +454,8 @@ const isUploadId = (value?: string): boolean =>
 
 app.post('/api/admin/upload-asset/chunk', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{
@@ -517,8 +517,8 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
 
 app.post('/api/admin/upload-asset/finalize', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{ uploadId?: string }>();
@@ -585,8 +585,8 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
 
 app.post('/api/admin/upload-asset', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
@@ -633,7 +633,7 @@ app.post('/api/moderator/create-post', async (c) => {
   try {
     const subredditName = context.subredditName;
     if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
 
     const adminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
@@ -671,8 +671,8 @@ app.post('/internal/menu/create-admin', async (c) => {
   try {
     await c.req.json<MenuItemRequest>().catch(() => ({}));
     const { subredditName } = context;
-    if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
-      return c.json<UiResponse>({ showToast: 'Moderator access is required.' });
+    if (!subredditName || !(await isCurrentUserSubredditOwner(subredditName))) {
+      return c.json<UiResponse>({ showToast: 'Only this subreddit’s top moderator can create the admin panel.' });
     }
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
