@@ -7,6 +7,7 @@ import {
   LABEL_FONTS,
   LABEL_SIZES,
   LABEL_WEIGHTS,
+  OUTLINE_STYLES,
   getDefaultAdminConfig,
   getSubredditLink,
   getSubredditNameFromUrl,
@@ -251,6 +252,7 @@ export const AdminApp = () => {
       labelFont: LABEL_FONTS[0].value,
       labelSize: LABEL_SIZES[1].value,
       labelWeight: 800,
+      outlineStyle: 'electric',
       enabled: true,
     }],
   }));
@@ -576,13 +578,13 @@ export const AdminApp = () => {
 
   if (mode === 'inline') {
     return (
-      <main className="admin">
+      <main className="admin admin--inline">
         <div className="panel">
           <header className="hero">
             <div>
               <p className="eyebrow">Moderator Configuration</p>
               <h1>Community Navigation Admin</h1>
-              <p className="hint">Open the expanded editor to scroll the dashboard. Only a moderator with Everything in this subreddit, or a moderator they explicitly grant, can change it.</p>
+              <p className="hint">Opens the expanded editor. Requires Everything in this subreddit, or an explicit grant.</p>
             </div>
           </header>
           <section className="section">
@@ -607,7 +609,7 @@ export const AdminApp = () => {
 
   if (accessDenied) {
     return (
-      <main className="admin">
+      <main className="admin admin--expanded">
         <div className="panel">
           <header className="hero">
             <div>
@@ -628,7 +630,7 @@ export const AdminApp = () => {
 
   if (loadError) {
     return (
-      <main className="admin">
+      <main className="admin admin--expanded">
         <div className="panel">
           <header className="hero">
             <div>
@@ -647,7 +649,7 @@ export const AdminApp = () => {
   }
 
   if (!ready) {
-    return <main className="admin"><div className="panel"><h1>Community Navigation Admin</h1><p>Checking access and loading configuration…</p></div></main>;
+    return <main className="admin admin--expanded"><div className="panel"><h1>Community Navigation Admin</h1><p>Checking access and loading configuration…</p></div></main>;
   }
 
   const welcomeUrls = config.welcomeGifVariants?.length
@@ -657,7 +659,7 @@ export const AdminApp = () => {
       : [];
 
   return (
-    <main className="admin">
+    <main className="admin admin--expanded">
       <div className="panel">
         <header className="hero">
           <div>
@@ -849,6 +851,11 @@ export const AdminApp = () => {
                   {Boolean(button.url && !getSubredditNameFromUrl(button.url)) && <p className="hint wide validation-error">Invalid destination. Use a direct https://www.reddit.com/r/SubredditName/ link only.</p>}
                   <label>Accent
                     <input type="color" value={colorValue(button.accent, '#ffffff')} onChange={(event) => updateButton(button.id, { accent: event.target.value })} />
+                  </label>
+                  <label>Outline
+                    <select value={button.outlineStyle ?? 'electric'} onChange={(event) => updateButton(button.id, { outlineStyle: event.target.value as 'electric' | 'glow' | 'none' })}>
+                      {OUTLINE_STYLES.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}
+                    </select>
                   </label>
                   <label>Label color
                     <input type="color" value={colorValue(button.labelColor, '#ffffff')} onChange={(event) => updateButton(button.id, { labelColor: event.target.value })} />

@@ -17,12 +17,20 @@ export type ManagedButton = {
   backgroundPositionY?: number;
   backgroundScale?: number;
   enabled?: boolean;
+  outlineStyle?: OutlineStyle;
 };
 
 export type ManagedAsset = { id: string; name: string; url: string; type: 'image' | 'gif' };
 
 export type WelcomeGifFit = 'natural' | 'canvas';
 export type BackgroundStyle = 'petals' | 'custom';
+export type OutlineStyle = 'electric' | 'glow' | 'none';
+
+export const OUTLINE_STYLES = [
+  { id: 'electric', label: 'Electric' },
+  { id: 'glow', label: 'Glow' },
+  { id: 'none', label: 'None' },
+] as const;
 
 export type AdminConfig = {
   version: 1;
@@ -70,6 +78,7 @@ export const LABEL_WEIGHTS = [600, 700, 800] as const;
 const LABEL_FONT_VALUES = new Set<string>(LABEL_FONTS.map((font) => font.value));
 const LABEL_SIZE_VALUES = new Set<string>(LABEL_SIZES.map((size) => size.value));
 const LABEL_WEIGHT_VALUES = new Set<number>(LABEL_WEIGHTS);
+const OUTLINE_STYLE_VALUES = new Set<string>(OUTLINE_STYLES.map((style) => style.id));
 export const normalizeSubredditName = (subredditName?: string | null): string =>
   (subredditName ?? '').trim().replace(/^r\//i, '').toLowerCase();
 
@@ -333,12 +342,25 @@ export const normalizeAdminConfig = (value: unknown, mode: 'strict' | 'coerce'):
       }
     }
 
+    let outlineStyle: OutlineStyle | undefined;
+    const rawOutline = (button as { outlineStyle?: unknown }).outlineStyle;
+    if (rawOutline != null && rawOutline !== '') {
+      if (typeof rawOutline === 'string' && OUTLINE_STYLE_VALUES.has(rawOutline)) {
+        outlineStyle = rawOutline as OutlineStyle;
+      } else {
+        const message = `“${label}” has an outline style that is not Electric, Glow, or None.`;
+        if (mode === 'strict') return { ok: false, error: message };
+        warnings.push(message);
+      }
+    }
+
     buttons.push({
       id,
       label,
       type: 'subreddit',
       url: getSubredditLink(subredditName),
       enabled: button.enabled !== false,
+      outlineStyle,
       accent: sanitizeColor(button.accent),
       background,
       backgroundGradient,

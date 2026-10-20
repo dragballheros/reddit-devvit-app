@@ -203,6 +203,47 @@ const injectedGradient = normalizeAdminConfig({
 }, 'strict');
 assert.equal(injectedGradient.ok, false);
 
+const validButton = {
+  id: 'button-1',
+  label: 'Example',
+  type: 'subreddit',
+  url: 'https://www.reddit.com/r/example/',
+};
+const glowOutline = normalizeAdminConfig({
+  version: 1,
+  buttons: [{ ...validButton, outlineStyle: 'glow' }],
+  managedSubreddits: [],
+  assets: [],
+}, 'strict');
+assert.equal(glowOutline.ok, true);
+if (glowOutline.ok) assert.equal(glowOutline.config.buttons[0]?.outlineStyle, 'glow');
+
+const defaultOutline = normalizeAdminConfig({
+  version: 1,
+  buttons: [validButton],
+  managedSubreddits: [],
+  assets: [],
+}, 'strict');
+assert.equal(defaultOutline.ok, true);
+if (defaultOutline.ok) assert.equal(defaultOutline.config.buttons[0]?.outlineStyle, undefined);
+
+const rejectedOutline = normalizeAdminConfig({
+  version: 1,
+  buttons: [{ ...validButton, outlineStyle: 'rainbow' }],
+  managedSubreddits: [],
+  assets: [],
+}, 'strict');
+assert.equal(rejectedOutline.ok, false);
+
+const coercedOutline = normalizeAdminConfig({
+  version: 1,
+  buttons: [{ ...validButton, outlineStyle: 'rainbow' }],
+  managedSubreddits: [],
+  assets: [],
+}, 'coerce');
+assert.equal(coercedOutline.ok, true);
+if (coercedOutline.ok) assert.equal(coercedOutline.config.buttons[0]?.outlineStyle, undefined);
+
 const adminUi = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
 const menuUi = await readFile(new URL('../src/client/MenuApp.tsx', import.meta.url), 'utf8');
 assert.match(adminUi, /Connected Subreddits/);
@@ -213,7 +254,16 @@ assert.match(adminUi, /Replace Config/);
 assert.match(adminUi, />Editing/);
 assert.match(adminUi, /Save & Apply to r\//);
 assert.match(adminUi, /Open admin editor/);
+assert.match(adminUi, /admin--inline/);
 assert.match(adminUi, /requestExpandedMode\(event\.nativeEvent, 'admin'\)/);
+assert.match(adminUi, />Outline/);
+assert.match(adminUi, /OUTLINE_STYLES\.map/);
+assert.match(adminUi, /outlineStyle/);
+const sharedUi = await readFile(new URL('../src/shared/subreddit.ts', import.meta.url), 'utf8');
+assert.match(sharedUi, /label: 'Electric'/);
+assert.match(sharedUi, /label: 'Glow'/);
+assert.match(sharedUi, /label: 'None'/);
+assert.match(sharedUi, /not Electric, Glow, or None/);
 assert.match(adminUi, /Admin access required/);
 assert.match(adminUi, /setAccessDenied/);
 assert.match(adminUi, /Subreddit Menu/);
@@ -221,9 +271,25 @@ assert.doesNotMatch(adminUi, /Community Menu/);
 assert.match(adminUi, /Everything only/);
 assert.doesNotMatch(adminUi, /top moderator/);
 assert.match(menuUi, /requestExpandedMode\(event\.nativeEvent, entry\)/);
+assert.match(menuUi, /openExpanded\(event, 'default'\)/);
 assert.match(menuUi, /builtin-subreddit-menu/);
-assert.match(menuUi, /Open navigation/);
+assert.match(menuUi, /Open full menu/);
+assert.match(menuUi, /aria-label="Previous"/);
+assert.match(menuUi, /aria-label="Next"/);
+assert.match(menuUi, /carousel__track/);
+assert.match(menuUi, /app--inline/);
+assert.doesNotMatch(menuUi, /Open navigation/);
+assert.doesNotMatch(menuUi, /Open the expanded view to browse linked subreddits/);
 assert.doesNotMatch(menuUi, /100vh|100dvh/);
+const menuCss = await readFile(new URL('../src/client/index.css', import.meta.url), 'utf8');
+assert.match(menuCss, /\.app--inline[\s\S]*overflow:\s*hidden/);
+assert.match(menuCss, /transition:\s*transform\s+250ms/);
+assert.match(menuCss, /\.app--expanded \.portal-grid/);
+assert.match(menuCss, /prefers-reduced-motion/);
+assert.doesNotMatch(menuCss, /overscroll-behavior-y:\s*contain/);
+assert.doesNotMatch(menuCss, /96vh|94vh|100vh|100dvh/);
+const adminCss = await readFile(new URL('../src/client/admin.css', import.meta.url), 'utf8');
+assert.match(adminCss, /\.admin--inline\{[^}]*overflow:\s*hidden/);
 const webViewMode = await readFile(new URL('../src/client/useWebViewMode.ts', import.meta.url), 'utf8');
 const splashHtml = await readFile(new URL('../src/client/splash.html', import.meta.url), 'utf8');
 assert.match(webViewMode, /if \(!host\.devvit\) return 'inline'/);
@@ -232,6 +298,7 @@ assert.match(webViewMode, /getWebViewMode\(\) === 'expanded' \? 'expanded' : 'in
 assert.doesNotMatch(splashHtml, /100vh|100dvh|user-scalable=no/);
 const devvitConfig = await readFile(new URL('../devvit.json', import.meta.url), 'utf8');
 assert.doesNotMatch(devvitConfig, /"inline"\s*:/);
-assert.match(devvitConfig, /"entry": "splash.html"/);
+assert.match(devvitConfig, /"entry": "splash.html"\s*,\s*"height": "tall"/);
+assert.match(devvitConfig, /"entry": "admin.html"\s*,\s*"height": "regular"/);
 
 console.log('COMMUNITY_ISOLATION_TESTS_PASS');

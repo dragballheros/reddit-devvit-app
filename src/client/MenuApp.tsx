@@ -10,10 +10,12 @@ import {
   getSubredditLink,
   getSubredditNameFromUrl,
   getSubredditTitle,
+  type OutlineStyle,
 } from '../shared/subreddit';
 
 const INTRO_DURATION_MS = 1900;
 const MOBILE_INTRO_DURATION_MS = 1900;
+const INLINE_PAGE_SIZE = 4;
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -59,6 +61,7 @@ type PortalButtonProps = {
   backgroundPositionX?: number;
   backgroundPositionY?: number;
   backgroundScale?: number;
+  outlineStyle?: OutlineStyle;
 };
 
 const pickRandomItem = (items: string[], fallback: string) => {
@@ -135,10 +138,11 @@ const PortalButton = ({
   backgroundPositionX = 50,
   backgroundPositionY = 50,
   backgroundScale = 1,
+  outlineStyle = 'electric',
 }: PortalButtonProps) => {
   return (
     <button
-      className={`portal-button${background ? ' portal-button--image' : ''}`}
+      className={`portal-button portal-button--${outlineStyle}${background ? ' portal-button--image' : ''}`}
       style={
         {
           '--portal-accent': accent,
@@ -155,6 +159,9 @@ const PortalButton = ({
       aria-label={label}
       aria-busy={disabled}
     >
+      <span className="portal-button__outline" aria-hidden="true">
+        {outlineStyle === 'electric' && <span className="portal-button__outline-spin" />}
+      </span>
       <span
         className={`portal-button__background${background ? '' : ' portal-button__background--empty'}`}
         style={{ backgroundImage: background ? `url("${background}")` : backgroundGradient, backgroundPosition: `${backgroundPositionX}% ${backgroundPositionY}%`, backgroundSize: background ? `${backgroundScale * 100}% auto` : undefined }}
@@ -185,11 +192,31 @@ const openExpanded = (event: React.MouseEvent<HTMLButtonElement>, entry: 'defaul
   }
 };
 
+const Chevron = ({ direction }: { direction: 'left' | 'right' }) => (
+  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+    <path
+      d={direction === 'left' ? 'M14.5 5.5 8 12l6.5 6.5' : 'M9.5 5.5 16 12l-6.5 6.5'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const chunkPortals = <T,>(items: T[], size: number): T[][] => {
+  const pages: T[][] = [];
+  for (let index = 0; index < items.length; index += size) pages.push(items.slice(index, index + size));
+  return pages.length > 0 ? pages : [[]];
+};
+
 export const MenuApp = () => {
   const mode = useWebViewMode();
   const [isIntroHidden, setIsIntroHidden] = useState(false);
   const [config, setConfig] = useState(APP_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [page, setPage] = useState(0);
   const isMobile = useIsMobile();
   const isAndroid = context?.client?.name === 'ANDROID';
 
@@ -240,18 +267,19 @@ export const MenuApp = () => {
   }, [hasWelcomeGif, isMobile]);
 
   const portals = useMemo(() => {
-    if (!configLoaded) return [];
-
     const subredditMenuButton = {
       id: 'builtin-subreddit-menu',
       label: 'Subreddit Menu',
       accent: '#6ecbff',
+      outlineStyle: 'electric' as const,
       backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)',
       onClick: () => {
         const destination = getSubredditAboutLink(context?.subredditName);
         if (destination) navigateTo(destination);
       },
     };
+
+    if (!configLoaded) return [subredditMenuButton];
 
     const configuredButtons = (config.buttons ?? [])
       .filter((button) =>
@@ -270,6 +298,7 @@ export const MenuApp = () => {
         labelSize: button.labelSize,
         labelColor: button.labelColor,
         labelWeight: button.labelWeight,
+        outlineStyle: button.outlineStyle ?? 'electric',
         backgroundPositionX: button.backgroundPositionX,
         backgroundPositionY: button.backgroundPositionY,
         backgroundScale: button.backgroundScale,
@@ -290,6 +319,7 @@ export const MenuApp = () => {
     ].map((button, index) => ({
       ...button,
       id: `placeholder-${index + 1}`,
+      outlineStyle: 'electric' as const,
       onClick: () => {},
       disabled: true,
     }));
@@ -297,23 +327,87 @@ export const MenuApp = () => {
     return [subredditMenuButton, ...placeholders];
   }, [config.buttons, configLoaded]);
 
-  const aboutLink = getSubredditAboutLink(context?.subredditName);
+  const pages = useMemo(() => chunkPortals(portals, INLINE_PAGE_SIZE), [portals]);
+  const pageCount = pages.length;
+  const safePage = Math.min(page, Math.max(0, pageCount - 1));
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, Math.max(0, pageCount - 1)));
+  }, [pageCount]);
+
+  const menuBackground = (config.backgroundStyle ?? 'petals') === 'petals' || !config.customBackground ? (
+    <div className="menu__petals">
+      {Array.from({ length: 16 }, (_, index) => (
+        <span key={index} className={`menu__petal menu__petal--${index + 1}`} />
+      ))}
+    </div>
+  ) : (
+    <img className="menu__custom-background" src={config.customBackground} alt="" aria-hidden="true" />
+  );
 
   if (mode === 'inline') {
+    const showPager = pageCount > 1;
     return (
       <AppErrorBoundary>
-        <div className={`app app--ready ${isAndroid ? 'app--android' : ''}`}>
-          <section className="menu menu--petals">
+        <div className={`app app--inline app--ready ${isAndroid ? 'app--android' : ''}`}>
+          <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
             <div className="menu__overlay" />
-            <div className="launch">
-              <p className="menu__eyebrow">{subredditLabel}</p>
-              <h1 className="menu__title">Community Navigation</h1>
-              <p className="launch__copy">Open the expanded view to browse linked subreddits. The inline card stays fixed so scrolling the feed is not trapped.</p>
-              <div className="launch__actions">
-                <button type="button" className="launch__primary" onClick={(event) => openExpanded(event, 'default')}>Open navigation</button>
-                {aboutLink && (
-                  <button type="button" className="launch__secondary" onClick={() => navigateTo(aboutLink)}>Subreddit Menu</button>
-                )}
+            <div className="menu__content menu__content--inline">
+              <div className={`menu__background-layer menu__background-layer--${config.backgroundStyle ?? 'petals'}`} aria-hidden="true">
+                {menuBackground}
+              </div>
+              <header className="menu__header">
+                <p className="menu__eyebrow">{subredditLabel}</p>
+                <h1 className="menu__title">Welcome {context?.username ?? 'traveler'}</h1>
+              </header>
+              <div className="carousel" style={{ '--inline-slots': INLINE_PAGE_SIZE } as React.CSSProperties}>
+                <div className="carousel__viewport">
+                  <div
+                    className="carousel__track"
+                    style={{ transform: `translate3d(${safePage * -100}%, 0, 0)` }}
+                  >
+                    {pages.map((items, pageIndex) => (
+                      <div className="carousel__page" key={pageIndex} aria-hidden={pageIndex !== safePage}>
+                        {items.map(({ id, ...portal }, index) => (
+                          <PortalButton key={id} {...portal} index={pageIndex * INLINE_PAGE_SIZE + index} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="carousel__controls">
+                  {showPager && (
+                    <div className="carousel__nav">
+                      <button
+                        type="button"
+                        className={`carousel__arrow${safePage === 0 ? ' is-hidden' : ''}`}
+                        aria-label="Previous"
+                        aria-hidden={safePage === 0}
+                        tabIndex={safePage === 0 ? -1 : 0}
+                        onClick={() => setPage((current) => Math.max(0, current - 1))}
+                      >
+                        <Chevron direction="left" />
+                      </button>
+                      <p className="carousel__indicator" aria-live="polite">
+                        <span className="visually-hidden">Page </span>
+                        {safePage + 1} / {pageCount}
+                      </p>
+                      <button
+                        type="button"
+                        className={`carousel__arrow${safePage >= pageCount - 1 ? ' is-hidden' : ''}`}
+                        aria-label="Next"
+                        aria-hidden={safePage >= pageCount - 1}
+                        tabIndex={safePage >= pageCount - 1 ? -1 : 0}
+                        onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+                      >
+                        <Chevron direction="right" />
+                      </button>
+                    </div>
+                  )}
+                  <button type="button" className="carousel__expand" onClick={(event) => openExpanded(event, 'default')}>
+                    Open full menu
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -324,26 +418,12 @@ export const MenuApp = () => {
 
   return (
     <AppErrorBoundary>
-      <div className={`app ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
+      <div className={`app app--expanded ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
       <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
         <div className="menu__overlay" />
         <div className="menu__content">
           <div className={`menu__background-layer menu__background-layer--${config.backgroundStyle ?? 'petals'}`} aria-hidden="true">
-            {(config.backgroundStyle ?? 'petals') === 'petals' ? (
-              <div className="menu__petals">
-                {Array.from({ length: 16 }, (_, index) => (
-                  <span key={index} className={`menu__petal menu__petal--${index + 1}`} />
-                ))}
-              </div>
-            ) : config.customBackground ? (
-              <img className="menu__custom-background" src={config.customBackground} alt="" aria-hidden="true" />
-            ) : (
-              <div className="menu__petals">
-                {Array.from({ length: 16 }, (_, index) => (
-                  <span key={index} className={`menu__petal menu__petal--${index + 1}`} />
-                ))}
-              </div>
-            )}
+            {menuBackground}
           </div>
           <header className="menu__header">
             <p className="menu__eyebrow">{subredditLabel}</p>

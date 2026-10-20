@@ -6,23 +6,30 @@ Community Navigation is a Reddit Devvit custom post that helps members move betw
 
 ## What members see
 
-The public post stays an inline card in the feed. In Devvit 0.14.7 the `inline` flag in `devvit.json` is ignored, and every post entrypoint starts inline. **Open navigation** is the only control that asks Reddit to expand it. The full menu is not rendered in the feed unless Reddit reports that the post is already expanded. **Open navigation** then shows:
+The public post stays an inline card in the feed. In Devvit 0.14.7 the `inline` flag in `devvit.json` is ignored, and every post entrypoint starts inline. The card uses the tall inline height and shows the menu itself. It does not scroll: there is no overflow scrolling, no wheel or touch-drag scrolling, and no swipe between pages. Members move with buttons only.
 
-- A welcome image or GIF, when one is configured. If several are saved, one is chosen at random on each load. With none saved, the post goes straight to the buttons.
-- A fixed **Subreddit Menu** button. It always opens `https://www.reddit.com/r/{currentSubreddit}/about/` for the subreddit where that post is running. Moderators do not edit this URL.
-- The configured subreddit buttons, with their labels, colors, gradients, icons, and backgrounds.
-- Four disabled placeholders (**Subreddit 1** through **Subreddit 4**) when no destinations are configured yet. The Subreddit Menu button is still active.
-- A petal background, or a custom Reddit-hosted image or GIF.
+Inline, the card shows:
 
-The inline card also offers **Subreddit Menu** directly, without opening the full list.
+- A fixed **Subreddit Menu** button, then as many configured subreddit buttons as fit on one page (four buttons per page, including Subreddit Menu). Welcome media is omitted here so the buttons stay visible.
+- **Previous** and **Next** chevrons when more than one page is needed. Tapping one slides the next set of buttons in. **Previous** is hidden on the first page, **Next** is hidden on the last page, and both are hidden when every button fits on one page. A page indicator such as `1 / 3` appears only when there is more than one page.
+- **Open full menu**, which asks Reddit to open the expanded view.
+
+The expanded view can scroll. It shows the welcome image or GIF when one is configured, **Subreddit Menu**, and every subreddit button. If several welcome files are saved, one is chosen at random on each load.
+
+Every public button can use an **Electric**, **Glow**, or **None** outline. Electric is the default: a bright segment in that button’s accent color travels around the border. Glow is a steady accent ring. None is a plain light ring. With reduced motion, Electric becomes a steady glow and the page change is instant.
+
+- **Subreddit Menu** always opens `https://www.reddit.com/r/{currentSubreddit}/about/` for the subreddit where that post is running. Moderators do not edit this URL.
+- Configured buttons keep their labels, colors, gradients, icons, and backgrounds.
+- Four disabled placeholders (**Subreddit 1** through **Subreddit 4**) appear when no destinations are configured yet. The Subreddit Menu button is still active.
+- A petal background, or a custom Reddit-hosted image or GIF, sits behind the buttons.
 
 ## What moderators can configure
 
-The **Community Navigation Admin** panel is a separate custom post. It opens in the expanded editor so the form can scroll.
+The **Community Navigation Admin** panel is a separate custom post. Inline, it is a fixed launcher with **Open admin editor** and does not scroll. The form scrolls only after that control opens the expanded editor.
 
 - Welcome images and GIFs, including how each one is fitted.
 - Petal or custom backgrounds.
-- Subreddit buttons: label, destination, accent, label color, font, size, weight, gradient, icon, background, and background position/scale. A button can be disabled without deleting it.
+- Subreddit buttons: label, destination, accent, outline (**Electric**, **Glow**, or **None**), label color, font, size, weight, gradient, icon, background, and background position/scale. A button can be disabled without deleting it. Omitting the outline keeps **Electric**.
 - An asset library of Reddit-hosted images and GIFs. Deleting an asset clears references to it.
 - Several subreddits from one admin post. Each connected subreddit has its own buttons, welcome media, backgrounds, and label styles. This community keeps its own configuration too.
 
@@ -74,7 +81,7 @@ npm run dev
 
 `npm run login` runs `devvit login`. `npm run dev` runs `devvit playtest`.
 
-`devvit.json` sets the default playtest subreddit to `communitypro_dev`. Override it for one session with `DEVVIT_SUBREDDIT`, or change `dev.subreddit`. The account that playtests must moderate that community. A moderator with Everything creates the admin panel from the post menu. The public entrypoint uses height `regular`, which only sizes the inline feed card. Expanded mode ignores that height.
+`devvit.json` sets the default playtest subreddit to `communitypro_dev`. Override it for one session with `DEVVIT_SUBREDDIT`, or change `dev.subreddit`. The account that playtests must moderate that community. A moderator with Everything creates the admin panel from the post menu. The public entrypoint uses height `tall`, the largest named inline size. The admin entrypoint stays `regular` because its inline view is only the launcher. Expanded mode ignores those heights.
 
 Playtest, upload, and publish need an interactive Reddit login. They are not run by the repository’s automated checks.
 
@@ -106,7 +113,7 @@ GitHub Actions runs the isolation tests, TypeScript check, and production build 
 
 A navigation post created before this per-subreddit storage keeps showing the configuration it shows today. The first time someone who can open this panel, and who has Everything in that subreddit, loads the dashboard, that configuration is stored on the navigation post itself. Later edits to this community do not change it. If that permission cannot be confirmed, the post stays linked to this community. Saving this community can still change a post that has not been given its own copy.
 
-Confirm an ungranted moderator is denied, a removed moderator loses access immediately, a moderator who loses Everything loses owner access, and external or non-subreddit URLs are rejected. In the feed, confirm the public post shows **Open navigation** and does not open the full menu until that button is used. Check the expanded post on web and mobile, and confirm every destination and image complies with Reddit’s current rules.
+Confirm an ungranted moderator is denied, a removed moderator loses access immediately, a moderator who loses Everything loses owner access, and external or non-subreddit URLs are rejected. In the feed, confirm the public post shows **Subreddit Menu**, the visible subreddit buttons, and **Open full menu**, and that the inline card does not scroll. Use **Next** and **Previous** only when more buttons exist than fit on one page. Check the expanded post on web and mobile, and confirm every destination and image complies with Reddit’s current rules.
 
 ## Compliance
 
