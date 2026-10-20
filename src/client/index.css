@@ -915,7 +915,7 @@ button { font: inherit; }
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  min-height: 42px;
+  min-height: 48px;
 }
 
 .carousel__nav {
@@ -927,7 +927,7 @@ button { font: inherit; }
 }
 
 .carousel__arrow,
-.carousel__expand {
+.subreddit-menu {
   color: white;
   cursor: pointer;
 }
@@ -961,15 +961,45 @@ button { font: inherit; }
   color: rgba(255, 255, 255, 0.88);
 }
 
-.carousel__expand {
+.subreddit-menu {
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   border: 0;
-  border-radius: 999px;
-  padding: 10px 14px;
-  font-size: 0.82rem;
+  border-radius: 16px;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
-  background: linear-gradient(120deg, #6ecbff, #8d6bff);
-  box-shadow: 0 8px 18px rgba(110, 140, 255, 0.28);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 38%),
+    linear-gradient(120deg, #173056 0%, #3a2468 52%, #12384a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 0 0 1px rgba(140, 214, 255, 0.55),
+    0 10px 22px rgba(18, 24, 48, 0.45);
+}
+
+.subreddit-menu::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 18%, rgba(255, 255, 255, 0.16) 48%, transparent 78%);
+}
+
+.app--expanded .subreddit-menu {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 68px;
+  font-size: 0.95rem;
 }
 
 .visually-hidden {

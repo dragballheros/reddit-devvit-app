@@ -10,17 +10,17 @@ The public post stays an inline card in the feed. In Devvit 0.14.7 the `inline` 
 
 Inline, the card shows:
 
-- A fixed **Subreddit Menu** button, then as many configured subreddit buttons as fit on one page (four buttons per page, including Subreddit Menu). When welcome media is saved, it plays across this card first, then the buttons appear. The card still does not scroll.
+- As many configured subreddit buttons as fit on one page (four per page). When welcome media is saved, it plays across this card first, then the buttons appear. The card still does not scroll.
 - **Previous** and **Next** chevrons when more than one page is needed. Tapping one slides the next set of buttons in. **Previous** is hidden on the first page, **Next** is hidden on the last page, and both are hidden when every button fits on one page. A page indicator such as `1 / 3` appears only when there is more than one page.
-- **Open full menu**, which asks Reddit to open the expanded view.
+- **Subreddit Menu**, a text button with no icon, in the control row. It opens this subreddit’s About page.
 
-The expanded view can scroll. Opening it plays the welcome image or GIF again, then shows **Subreddit Menu** and every subreddit button. If several welcome files are saved, one is chosen at random on each load. Welcome media defaults to **Blurred fill**: the file stays sharp and fully visible in the center, and a second copy of the same file is scaled to cover the frame, blurred, and slightly darkened behind it. That fills whichever bars the sharp image leaves. **Side blur** locks a portrait file to the frame height so the blurred copy fills the left and right. **Top/bottom blur** locks a widescreen file to the frame width so the blurred copy fills the bars above and below. A new upload is set to **Side blur** when the file is taller than it is wide, and to **Top/bottom blur** when it is wider than it is tall. Nearly square files, and files whose size cannot be read, stay on **Blurred fill**. **Large / fill height** and **Fit app canvas** are the other **Display** choices. The blur is one background layer. Reduced motion keeps that still fill and skips the decorative title motion.
+The expanded view can scroll. It plays the welcome image or GIF, then shows the same **Subreddit Menu** button and every subreddit button. If several welcome files are saved, one is chosen at random on each load. Welcome media defaults to **Blurred fill**: the file stays sharp and fully visible in the center, and a second copy of the same file is scaled to cover the frame, blurred, and slightly darkened behind it. That fills whichever bars the sharp image leaves. **Side blur** locks a portrait file to the frame height so the blurred copy fills the left and right. **Top/bottom blur** locks a widescreen file to the frame width so the blurred copy fills the bars above and below. A new upload is set to **Side blur** when the file is taller than it is wide, and to **Top/bottom blur** when it is wider than it is tall. Nearly square files, and files whose size cannot be read, stay on **Blurred fill**. **Large / fill height** and **Fit app canvas** are the other **Display** choices. The blur is one background layer. Reduced motion keeps that still fill and skips the decorative title motion.
 
 Every public button can use an **Electric**, **Glow**, or **None** outline. Electric is the default: a bright segment in that button’s accent color travels around the border. Glow is a steady accent ring. None is a plain light ring. With reduced motion, Electric becomes a steady glow and the page change is instant.
 
 - **Subreddit Menu** always opens `https://www.reddit.com/r/{currentSubreddit}/about/` for the subreddit where that post is running. Moderators do not edit this URL.
 - Configured buttons keep their labels, colors, gradients, icons, and backgrounds.
-- Four disabled placeholders (**Subreddit 1** through **Subreddit 4**) appear when no destinations are configured yet. The Subreddit Menu button is still active.
+- Four disabled placeholders (**Subreddit 1** through **Subreddit 4**) appear when no destinations are configured yet. **Subreddit Menu** stays active and does not take one of those four slots.
 - A petal background, or a custom Reddit-hosted image or GIF, sits behind the buttons.
 
 ## What moderators can configure
@@ -113,7 +113,7 @@ GitHub Actions runs the isolation tests, TypeScript check, and production build 
 
 A navigation post created before this per-subreddit storage keeps showing the configuration it shows today. The first time someone who can open this panel, and who has Everything in that subreddit, loads the dashboard, that configuration is stored on the navigation post itself. Later edits to this community do not change it. If that permission cannot be confirmed, the post stays linked to this community. Saving this community can still change a post that has not been given its own copy.
 
-Confirm an ungranted moderator is denied, a removed moderator loses access immediately, a moderator who loses Everything loses owner access, and external or non-subreddit URLs are rejected. In the feed, confirm the public post shows **Subreddit Menu**, the visible subreddit buttons, and **Open full menu**, and that the inline card does not scroll. Use **Next** and **Previous** only when more buttons exist than fit on one page. Check the expanded post on web and mobile, and confirm every destination and image complies with Reddit’s current rules.
+Confirm an ungranted moderator is denied, a removed moderator loses access immediately, a moderator who loses Everything loses owner access, and external or non-subreddit URLs are rejected. In the feed, confirm the public post shows the subreddit buttons and **Subreddit Menu**, and that the inline card does not scroll. Use **Next** and **Previous** only when more buttons exist than fit on one page. Check the expanded post on web and mobile, and confirm every destination and image complies with Reddit’s current rules.
 
 ## Compliance
 

@@ -1,6 +1,6 @@
 import './index.css';
 
-import { context, navigateTo, requestExpandedMode } from '@devvit/web/client';
+import { context, navigateTo } from '@devvit/web/client';
 import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useWebViewMode } from './useWebViewMode';
 import {
@@ -44,6 +44,25 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
     return this.props.children;
   }
 }
+
+type PortalItem = {
+  id: string;
+  label: string;
+  onClick: () => void;
+  background?: string;
+  backgroundGradient?: string;
+  icon?: string;
+  accent?: string;
+  labelFont?: string;
+  labelSize?: string;
+  labelColor?: string;
+  labelWeight?: number;
+  disabled?: boolean;
+  backgroundPositionX?: number;
+  backgroundPositionY?: number;
+  backgroundScale?: number;
+  outlineStyle?: OutlineStyle;
+};
 
 type PortalButtonProps = {
   label: string;
@@ -184,14 +203,6 @@ const PortalButton = ({
   );
 };
 
-const openExpanded = (event: React.MouseEvent<HTMLButtonElement>, entry: 'default' | 'admin') => {
-  try {
-    requestExpandedMode(event.nativeEvent, entry);
-  } catch (error) {
-    console.error('Could not open the expanded view', error);
-  }
-};
-
 const Chevron = ({ direction }: { direction: 'left' | 'right' }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
     <path
@@ -280,20 +291,13 @@ export const MenuApp = () => {
     };
   }, [hasWelcomeGif, isMobile, mode]);
 
-  const portals = useMemo(() => {
-    const subredditMenuButton = {
-      id: 'builtin-subreddit-menu',
-      label: 'Subreddit Menu',
-      accent: '#6ecbff',
-      outlineStyle: 'electric' as const,
-      backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)',
-      onClick: () => {
-        const destination = getSubredditAboutLink(context?.subredditName);
-        if (destination) navigateTo(destination);
-      },
-    };
+  const openSubredditMenu = () => {
+    const destination = getSubredditAboutLink(context?.subredditName);
+    if (destination) navigateTo(destination);
+  };
 
-    if (!configLoaded) return [subredditMenuButton];
+  const portals = useMemo((): PortalItem[] => {
+    if (!configLoaded) return [];
 
     const configuredButtons = (config.buttons ?? [])
       .filter((button) =>
@@ -323,7 +327,7 @@ export const MenuApp = () => {
         },
       }));
 
-    if (configuredButtons.length > 0) return [subredditMenuButton, ...configuredButtons];
+    if (configuredButtons.length > 0) return configuredButtons;
 
     const placeholders = [
       { label: 'Subreddit 1', accent: '#b18cff', backgroundGradient: 'linear-gradient(120deg, #1b1b2f, #3d2c63, #090a12)' },
@@ -338,7 +342,7 @@ export const MenuApp = () => {
       disabled: true,
     }));
 
-    return [subredditMenuButton, ...placeholders];
+    return placeholders;
   }, [config.buttons, configLoaded]);
 
   const pages = useMemo(() => chunkPortals(portals, INLINE_PAGE_SIZE), [portals]);
@@ -477,8 +481,8 @@ export const MenuApp = () => {
                       </button>
                     </div>
                   )}
-                  <button type="button" className="carousel__expand" onClick={(event) => openExpanded(event, 'default')}>
-                    Open full menu
+                  <button type="button" id="builtin-subreddit-menu" className="subreddit-menu" onClick={openSubredditMenu}>
+                    Subreddit Menu
                   </button>
                 </div>
               </div>
@@ -503,6 +507,9 @@ export const MenuApp = () => {
             <p className="menu__eyebrow">{subredditLabel}</p>
             <h1 className="menu__title">Welcome {context?.username ?? 'traveler'}</h1>
           </header>
+          <button type="button" id="builtin-subreddit-menu" className="subreddit-menu" onClick={openSubredditMenu}>
+            Subreddit Menu
+          </button>
 
           <div className="portal-grid" aria-label="Community navigation">
             {portals.map(({ id, ...portal }, index) => (
