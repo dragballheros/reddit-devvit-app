@@ -99,6 +99,50 @@ export const APP_CONFIG: AppConfig = {
 export const normalizeSubredditName = (subredditName?: string | null): string =>
   (subredditName ?? '').trim().replace(/^r\//i, '').toLowerCase();
 
+
+/** A valid Reddit post fullname, used to reject arbitrary client-supplied IDs. */
+const normalizeRedditPostId = (value: unknown): string | undefined =>
+  typeof value === 'string' && /^t3_[a-z0-9]+$/i.test(value) ? value : undefined;
+
+/** Only posts explicitly created as an admin panel are allowed to mutate config. */
+export const isAdminPanelPostData = (value: unknown): boolean =>
+  Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).portalAdmin === true
+  );
+
+/**
+ * Resolve the admin configuration for the current custom post.
+ * Admin panels use their own post data; managed public posts follow their
+ * server-written portalAdminPostId; legacy local posts fall back to this
+ * installation's own Redis pointer. Redis itself is per-subreddit install.
+ */
+export const resolveRuntimeAdminPostId = (input: {
+  currentPostId?: unknown;
+  postData?: unknown;
+  localAdminPostId?: unknown;
+}): string | undefined => {
+  if (isAdminPanelPostData(input.postData)) {
+    return normalizeRedditPostId(input.currentPostId);
+  }
+
+  if (input.postData && typeof input.postData === 'object' && !Array.isArray(input.postData)) {
+    const linkedId = normalizeRedditPostId((input.postData as Record<string, unknown>).portalAdminPostId);
+    if (linkedId) return linkedId;
+  }
+
+  return normalizeRedditPostId(input.localAdminPostId);
+};
+
+/** Normalize and validate a requested managed subreddit name. */
+export const normalizeManagedSubredditName = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = normalizeSubredditName(value);
+  return /^[a-z0-9_]{2,21}$/.test(normalized) ? normalized : undefined;
+};
+
 export const getSubredditTitle = (subredditName?: string | null): string => {
   const normalized = normalizeSubredditName(subredditName);
   return normalized ? `r/${normalized}` : 'Community';

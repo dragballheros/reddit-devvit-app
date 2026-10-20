@@ -41,6 +41,8 @@ From the app's custom-post menu, choose **Create Navigation Admin Panel**. The a
 
 The admin panel is accessed from the app's own custom-post menu. Reddit profile pinning is not performed automatically. Moderators can use Reddit's normal post pin controls if they want the configuration post pinned.
 
+Each subreddit installation has its own Redis-backed configuration and admin panel. A panel in one subreddit does not grant administrative access to another community's panel. If you select a managed subreddit, the app creates or updates only its own navigation post there, after checking that the requesting user is a moderator in that target community and that the app has the required installation/permissions. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel.
+
 ### 2. Configure the welcome screen
 
 In **Welcome Screen**:

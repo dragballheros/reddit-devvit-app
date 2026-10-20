@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
 import { inflateSync, deflateSync } from 'node:zlib';
-import { APP_CONFIG, getDefaultAdminConfig, getSubredditLink, getSubredditNameFromUrl, type AdminConfig, type AppConfig } from '../shared/subreddit';
+import { APP_CONFIG, getDefaultAdminConfig, getSubredditLink, getSubredditNameFromUrl, isAdminPanelPostData, normalizeManagedSubredditName, normalizeSubredditName, resolveRuntimeAdminPostId, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
@@ -14,8 +14,8 @@ type RedditPostId = `t3_${string}`;
 
 type TargetPostRecord = { subredditName: string; postId: RedditPostId };
 
-const toRedditPostId = (value?: string): RedditPostId | undefined =>
-  value?.startsWith('t3_') ? value as RedditPostId : undefined;
+const toRedditPostId = (value?: unknown): RedditPostId | undefined =>
+  typeof value === 'string' && /^t3_[a-z0-9]+$/i.test(value) ? value as RedditPostId : undefined;
 
 const encodeConfig = (config: AdminConfig): string =>
   deflateSync(Buffer.from(JSON.stringify(config), 'utf8')).toString('base64');
@@ -27,6 +27,8 @@ const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | un
   const redditPostId = toRedditPostId(postId);
   if (!redditPostId) return undefined;
   const data = await reddit.getPostData(redditPostId);
+  // A link to an arbitrary post must never be treated as an admin configuration.
+  if (!isAdminPanelPostData(data)) return undefined;
   const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
   if (!encoded) return undefined;
   const config = decodeConfig(encoded);
@@ -52,7 +54,22 @@ const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | un
 const getTargetPosts = async (): Promise<TargetPostRecord[]> => {
   const value = await redis.get(TARGET_POSTS_KEY);
   if (!value) return [];
-  try { return JSON.parse(value) as TargetPostRecord[]; } catch { return []; }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    const valid: TargetPostRecord[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const record = item as Record<string, unknown>;
+      const subredditName = normalizeManagedSubredditName(record.subredditName);
+      const postId = toRedditPostId(record.postId);
+      if (subredditName && postId) valid.push({ subredditName, postId });
+    }
+    // Keep one app-managed post record per target community in this installation.
+    return [...new Map(valid.map((item) => [item.subredditName, item])).values()];
+  } catch {
+    return [];
+  }
 };
 
 const saveTargetPosts = async (targets: TargetPostRecord[]) =>
@@ -71,7 +88,8 @@ const isValidAdminConfig = (value: unknown): value is AdminConfig => {
         getSubredditNameFromUrl(button.url)
       )
     ) &&
-    Array.isArray(config.managedSubreddits)
+    Array.isArray(config.managedSubreddits) &&
+    config.managedSubreddits.every((name) => Boolean(normalizeManagedSubredditName(name)))
   );
 };
 
@@ -95,6 +113,22 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
 const requireModerator = async (subredditName?: string) =>
   Boolean(subredditName && await isCurrentUserModerator(subredditName));
 
+/**
+ * Admin actions must run in a real admin-panel post in the current subreddit.
+ * Moderator status alone must not turn any public navigation post into an
+ * editable admin panel.
+ */
+const requireAdminPanelModerator = async (): Promise<boolean> => {
+  const postId = toRedditPostId(context.postId);
+  const subredditName = normalizeManagedSubredditName(context.subredditName);
+  return Boolean(
+    postId &&
+    subredditName &&
+    isAdminPanelPostData(context.postData) &&
+    await requireModerator(subredditName)
+  );
+};
+
 const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
   const user =
     context.userId
@@ -111,10 +145,11 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
 
 app.get('/api/runtime-config', async (c) => {
   try {
-    const isAdminPanel = context.postData?.portalAdmin === true;
-    const adminPostId = isAdminPanel
-      ? toRedditPostId(context.postId)
-      : toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
+    const adminPostId = resolveRuntimeAdminPostId({
+      currentPostId: context.postId,
+      postData: context.postData,
+      localAdminPostId: await redis.get(ADMIN_POST_KEY) ?? undefined,
+    });
     const adminConfig = await getAdminConfigFromPost(adminPostId);
     return c.json({ config: effectiveConfig(adminConfig), adminPostId: adminPostId ?? null });
   } catch (error) {
@@ -125,7 +160,7 @@ app.get('/api/runtime-config', async (c) => {
 
 app.get('/api/admin/config', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName)) || !context.postId) {
+    if (!(await requireAdminPanelModerator())) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
     const config = await getAdminConfigFromPost(context.postId) ?? getDefaultAdminConfig();
@@ -154,7 +189,7 @@ app.get('/api/moderator-status', async (c) => {
 
 app.post('/api/admin/save', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName)) || !context.postId) {
+    if (!(await requireAdminPanelModerator())) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ config: AdminConfig }>();
@@ -167,7 +202,7 @@ app.post('/api/admin/save', async (c) => {
         type: 'subreddit',
         url: getSubredditLink(getSubredditNameFromUrl(button.url)),
       })),
-      managedSubreddits: payload.config.managedSubreddits.map((name) => name.trim().replace(/^r\//i, '')).filter(Boolean),
+      managedSubreddits: [...new Set(payload.config.managedSubreddits.map((name) => normalizeManagedSubredditName(name)!))],
     };
     const encoded = encodeConfig(config);
     if (JSON.stringify({ portalAdmin: true, portalConfig: encoded }).length > 2000) {
@@ -177,6 +212,16 @@ app.post('/api/admin/save', async (c) => {
     const adminPostId = toRedditPostId(context.postId);
     if (!adminPostId) return c.json({ error: 'Invalid Reddit post ID.' }, 400);
     const adminPost = await reddit.getPostById(adminPostId);
+    if (
+      normalizeSubredditName(adminPost.subredditName) !==
+      normalizeSubredditName(context.subredditName)
+    ) {
+      return c.json({ error: 'Admin panel does not belong to this subreddit.' }, 403);
+    }
+    const storedAdminData = await reddit.getPostData(adminPostId);
+    if (!isAdminPanelPostData(storedAdminData)) {
+      return c.json({ error: 'This post is not a valid admin panel.' }, 403);
+    }
     await adminPost.setPostData({ portalAdmin: true, portalConfig: encoded, updatedAt: Date.now() });
 
     const existing = await getTargetPosts();
@@ -193,6 +238,23 @@ app.post('/api/admin/save', async (c) => {
         if (current) {
           try {
             const post = await reddit.getPostById(current.postId);
+            if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
+              results.push({
+                subredditName,
+                status: 'error',
+                error: 'Stored post belongs to a different subreddit. No changes were made.',
+              });
+              continue;
+            }
+            const storedTargetData = await reddit.getPostData(current.postId);
+            if (!toRedditPostId(storedTargetData?.portalAdminPostId)) {
+              results.push({
+                subredditName,
+                status: 'error',
+                error: 'Stored post is not linked to an admin panel. No changes were made.',
+              });
+              continue;
+            }
             await post.setPostData({ portalAdminPostId: adminPostId });
             results.push({ subredditName, status: 'updated', postId: current.postId });
           } catch (error) {
@@ -250,7 +312,7 @@ const isUploadId = (value?: string): boolean =>
 
 app.post('/api/admin/upload-asset/chunk', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName))) {
+    if (!(await requireAdminPanelModerator())) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
@@ -313,7 +375,7 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
 
 app.post('/api/admin/upload-asset/finalize', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName))) {
+    if (!(await requireAdminPanelModerator())) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
@@ -381,7 +443,7 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
 
 app.post('/api/admin/upload-asset', async (c) => {
   try {
-    if (!(await requireModerator(context.subredditName))) {
+    if (!(await requireAdminPanelModerator())) {
       return c.json({ error: 'Moderator access required.' }, 403);
     }
 
@@ -510,6 +572,9 @@ app.post('/internal/menu/create-post', async (c) => {
       return c.json<UiResponse>({
         showToast: 'Reddit did not provide the subreddit context. Please try again.',
       });
+    }
+    if (!(await isCurrentUserModerator(subredditName))) {
+      return c.json<UiResponse>({ showToast: 'Moderator access is required.' });
     }
 
     console.log('Create post menu action received for r/' + subredditName);
