@@ -84,6 +84,11 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
         welcomeGifFitByUrl: admin.welcomeGifFitByUrl,
         backgroundStyle: admin.backgroundStyle ?? 'petals',
         customBackground: admin.customBackground,
+        backgroundDim: admin.backgroundDim,
+        backgroundBlur: admin.backgroundBlur,
+        cardStyle: admin.cardStyle,
+        tagline: admin.tagline,
+        audioUrl: admin.audioUrl,
         buttons: admin.buttons,
       }
     : APP_CONFIG;
