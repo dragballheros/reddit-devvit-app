@@ -70,6 +70,7 @@ assert.match(route('/api/admin/access', 'get'), /requireAdminPanelOwner\(\)/, 'o
 assert.match(route('/api/admin/access'), /requireAdminPanelOwner\(\)/, 'only the top moderator may grant or revoke access');
 assert.match(server, /getModerators\(\)\.get\(1000\)/, 'delegation must be based on a live moderator-team scan');
 assert.match(server, /getDelegatedAdminUsernames\(subredditName\)/, 'admin access must consult the subreddit-scoped delegation list');
+assert.match(server, /record\.ownerUsername !== liveOwner/, 'delegated grants must be invalidated when the top moderator changes');
 assert.match(server, /await isCurrentUserModerator\(subredditName\)/, 'delegated access must revalidate live moderator status on every admin request');
 assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the top moderator may create or replace the admin panel');
 
