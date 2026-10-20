@@ -695,6 +695,8 @@ app.post('/internal/menu/create-admin', async (c) => {
       await redis.del(ADMIN_POST_KEY);
     }
 
+    // Replacing the canonical admin panel resets grants from the old panel.
+    await redis.del(DELEGATED_ADMINS_KEY);
     const config = getDefaultAdminConfig();
     const post = await reddit.submitCustomPost({
       subredditName,
@@ -725,7 +727,7 @@ app.post('/internal/menu/create-post', async (c) => {
       });
     }
     if (!(await isCurrentUserModerator(subredditName))) {
-      return c.json<UiResponse>({ showToast: 'Subreddit top-moderator access is required.' });
+      return c.json<UiResponse>({ showToast: 'Moderator access is required in this subreddit.' });
     }
 
     console.log('Create post menu action received for r/' + subredditName);
