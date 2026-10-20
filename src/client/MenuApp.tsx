@@ -1,7 +1,8 @@
 import './index.css';
 
-import { context, navigateTo } from '@devvit/web/client';
+import { context, navigateTo, requestExpandedMode } from '@devvit/web/client';
 import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { useWebViewMode } from './useWebViewMode';
 import {
   APP_CONFIG,
   getSubredditAboutLink,
@@ -9,7 +10,6 @@ import {
   getSubredditLink,
   getSubredditNameFromUrl,
   getSubredditTitle,
-  normalizeSubredditName,
 } from '../shared/subreddit';
 
 const INTRO_DURATION_MS = 1900;
@@ -67,8 +67,9 @@ const pickRandomItem = (items: string[], fallback: string) => {
 };
 
 const getMobileSnapshot = () => {
+  const clientName = context?.client?.name;
   if (typeof window === 'undefined') {
-    return context.client?.name === 'ANDROID' || context.client?.name === 'IOS';
+    return clientName === 'ANDROID' || clientName === 'IOS';
   }
 
   const ua = window.navigator?.userAgent ?? '';
@@ -85,8 +86,8 @@ const getMobileSnapshot = () => {
     Boolean(uaMobile) ||
     window.innerWidth <= 600 ||
     coarsePointer ||
-    context.client?.name === 'ANDROID' ||
-    context.client?.name === 'IOS'
+    clientName === 'ANDROID' ||
+    clientName === 'IOS'
   );
 };
 
@@ -176,12 +177,21 @@ const PortalButton = ({
   );
 };
 
+const openExpanded = (event: React.MouseEvent<HTMLButtonElement>, entry: 'default' | 'admin') => {
+  try {
+    requestExpandedMode(event.nativeEvent, entry);
+  } catch (error) {
+    console.error('Could not open the expanded view', error);
+  }
+};
+
 export const MenuApp = () => {
+  const mode = useWebViewMode();
   const [isIntroHidden, setIsIntroHidden] = useState(false);
   const [config, setConfig] = useState(APP_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
   const isMobile = useIsMobile();
-  const isAndroid = context.client?.name === 'ANDROID';
+  const isAndroid = context?.client?.name === 'ANDROID';
 
   useEffect(() => {
     let active = true;
@@ -214,9 +224,8 @@ export const MenuApp = () => {
   );
   const sessionGifFit = config.welcomeGifFitByUrl?.[sessionGifSrc] ?? 'natural';
 
-  const subredditTitle = getSubredditTitle(context.subredditName);
-  const subredditLabel = getSubredditLabel(context.subredditName);
-  const currentSubredditName = normalizeSubredditName(context.subredditName);
+  const subredditTitle = getSubredditTitle(context?.subredditName);
+  const subredditLabel = getSubredditLabel(context?.subredditName);
 
   useEffect(() => {
     if (!hasWelcomeGif) {
@@ -234,11 +243,12 @@ export const MenuApp = () => {
     if (!configLoaded) return [];
 
     const subredditMenuButton = {
+      id: 'builtin-subreddit-menu',
       label: 'Subreddit Menu',
       accent: '#6ecbff',
       backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)',
       onClick: () => {
-        const destination = getSubredditAboutLink(context.subredditName);
+        const destination = getSubredditAboutLink(context?.subredditName);
         if (destination) navigateTo(destination);
       },
     };
@@ -250,6 +260,7 @@ export const MenuApp = () => {
         Boolean(getSubredditNameFromUrl(button.url))
       )
       .map((button) => ({
+        id: button.id,
         label: button.label,
         background: button.background,
         backgroundGradient: button.backgroundGradient,
@@ -276,14 +287,40 @@ export const MenuApp = () => {
       { label: 'Subreddit 2', accent: '#6ecbff', backgroundGradient: 'linear-gradient(120deg, #10243a, #164b63, #07121f)' },
       { label: 'Subreddit 3', accent: '#ff8fcf', backgroundGradient: 'linear-gradient(120deg, #35162f, #6b315b, #120914)' },
       { label: 'Subreddit 4', accent: '#8ff0c8', backgroundGradient: 'linear-gradient(120deg, #102f2b, #1d5c50, #071513)' },
-    ].map((button) => ({
+    ].map((button, index) => ({
       ...button,
+      id: `placeholder-${index + 1}`,
       onClick: () => {},
       disabled: true,
     }));
 
     return [subredditMenuButton, ...placeholders];
   }, [config.buttons, configLoaded]);
+
+  const aboutLink = getSubredditAboutLink(context?.subredditName);
+
+  if (mode === 'inline') {
+    return (
+      <AppErrorBoundary>
+        <div className={`app app--ready ${isAndroid ? 'app--android' : ''}`}>
+          <section className="menu menu--petals">
+            <div className="menu__overlay" />
+            <div className="launch">
+              <p className="menu__eyebrow">{subredditLabel}</p>
+              <h1 className="menu__title">Community Navigation</h1>
+              <p className="launch__copy">Open the expanded view to browse linked subreddits. The inline card stays fixed so scrolling the feed is not trapped.</p>
+              <div className="launch__actions">
+                <button type="button" className="launch__primary" onClick={(event) => openExpanded(event, 'default')}>Open navigation</button>
+                {aboutLink && (
+                  <button type="button" className="launch__secondary" onClick={() => navigateTo(aboutLink)}>Subreddit Menu</button>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      </AppErrorBoundary>
+    );
+  }
 
   return (
     <AppErrorBoundary>
@@ -310,12 +347,12 @@ export const MenuApp = () => {
           </div>
           <header className="menu__header">
             <p className="menu__eyebrow">{subredditLabel}</p>
-            <h1 className="menu__title">Welcome {context.username ?? 'traveler'}</h1>
+            <h1 className="menu__title">Welcome {context?.username ?? 'traveler'}</h1>
           </header>
 
           <div className="portal-grid" aria-label="Community navigation">
-            {portals.map((portal, index) => (
-              <PortalButton key={portal.label} {...portal} index={index} />
+            {portals.map(({ id, ...portal }, index) => (
+              <PortalButton key={id} {...portal} index={index} />
             ))}
           </div>
         </div>

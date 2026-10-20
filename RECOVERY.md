@@ -1,3 +1,3 @@
-# hentaiapp recovery
+# Recovery note
 
-Recovered from the deployed hentaiapp v0.1.2 source map and MHTML capture.
+This repository was recovered from a deployed custom-post source map. It is now the SFW Community Navigation Devvit app described in the README.

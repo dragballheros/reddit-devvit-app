@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
 import { inflateSync, deflateSync } from 'node:zlib';
-import { APP_CONFIG, getDefaultAdminConfig, getSubredditLink, getSubredditNameFromUrl, isAdminPanelPostData, normalizeManagedSubredditName, normalizeSubredditName, resolveRuntimeAdminPostId, type AdminConfig, type AppConfig } from '../shared/subreddit';
+import { APP_CONFIG, getDefaultAdminConfig, isAdminPanelPostData, normalizeAdminConfig, normalizeManagedSubredditName, normalizeSubredditName, resolveRuntimeAdminPostId, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
@@ -23,32 +23,23 @@ const encodeConfig = (config: AdminConfig): string =>
 const decodeConfig = (value: string): AdminConfig =>
   JSON.parse(inflateSync(Buffer.from(value, 'base64')).toString('utf8')) as AdminConfig;
 
-const getAdminConfigFromPost = async (postId?: string): Promise<AdminConfig | undefined> => {
+const getAdminConfigFromPost = async (postId?: string): Promise<{ config?: AdminConfig; warnings: string[] }> => {
   const redditPostId = toRedditPostId(postId);
-  if (!redditPostId) return undefined;
+  if (!redditPostId) return { warnings: [] };
   const data = await reddit.getPostData(redditPostId);
   // A link to an arbitrary post must never be treated as an admin configuration.
-  if (!isAdminPanelPostData(data)) return undefined;
+  if (!isAdminPanelPostData(data)) return { warnings: [] };
   const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
-  if (!encoded) return undefined;
-  const config = decodeConfig(encoded);
-  // Drop legacy Discord, Modmail, arbitrary external, and invalid subreddit buttons.
-  // Only canonical subreddit destinations are allowed to survive config loading.
-  const buttons = Array.isArray(config.buttons)
-    ? config.buttons
-        .filter((button) => button?.type === 'subreddit' && Boolean(getSubredditNameFromUrl(button.url)))
-        .map((button) => ({
-          ...button,
-          type: 'subreddit' as const,
-          url: getSubredditLink(getSubredditNameFromUrl(button.url)),
-        }))
-    : [];
-  return {
-    ...config,
-    buttons,
-    assets: config.assets ?? [],
-    backgroundStyle: config.backgroundStyle === 'custom' ? 'custom' : 'petals',
-  };
+  if (!encoded) return { config: getDefaultAdminConfig(), warnings: [] };
+  try {
+    const normalized = normalizeAdminConfig(decodeConfig(encoded), 'coerce');
+    if (!normalized.ok) {
+      return { config: getDefaultAdminConfig(), warnings: ['Stored configuration could not be read. Saving will replace it.'] };
+    }
+    return { config: normalized.config, warnings: normalized.warnings };
+  } catch {
+    return { config: getDefaultAdminConfig(), warnings: ['Stored configuration could not be read. Saving will replace it.'] };
+  }
 };
 
 const getTargetPosts = async (): Promise<TargetPostRecord[]> => {
@@ -74,24 +65,6 @@ const getTargetPosts = async (): Promise<TargetPostRecord[]> => {
 
 const saveTargetPosts = async (targets: TargetPostRecord[]) =>
   redis.set(TARGET_POSTS_KEY, JSON.stringify(targets));
-
-const isValidAdminConfig = (value: unknown): value is AdminConfig => {
-  if (!value || typeof value !== 'object') return false;
-  const config = value as Partial<AdminConfig>;
-  return (
-    config.version === 1 &&
-    Array.isArray(config.buttons) &&
-    config.buttons.every((button) =>
-      Boolean(
-        button &&
-        button.type === 'subreddit' &&
-        getSubredditNameFromUrl(button.url)
-      )
-    ) &&
-    Array.isArray(config.managedSubreddits) &&
-    config.managedSubreddits.every((name) => Boolean(normalizeManagedSubredditName(name)))
-  );
-};
 
 const effectiveConfig = (admin?: AdminConfig): AppConfig =>
   admin
@@ -143,7 +116,7 @@ const getDelegatedAdminUsernames = async (subredditName: string): Promise<string
     const liveOwner = await getTopModeratorUsername(subredditName);
     if (!liveOwner || record.ownerUsername !== liveOwner || !Array.isArray(record.delegates)) return [];
     return [...new Set(record.delegates.filter((name): name is string =>
-      typeof name === 'string' && /^[a-z0-9_-]{1,20}$/i.test(name)
+      typeof name === 'string' && /^[a-z0-9_-]{3,20}$/i.test(name)
     ).map((name) => name.trim().toLowerCase()))];
   } catch {
     return [];
@@ -156,9 +129,11 @@ const saveDelegatedAdminUsernames = async (subredditName: string, usernames: str
     await redis.del(getDelegatedAdminsKey(subredditName));
     return;
   }
+  const delegates = [...new Set(usernames.map((name) => name.trim().toLowerCase()))]
+    .filter((name) => name !== ownerUsername && /^[a-z0-9_-]{3,20}$/i.test(name));
   return redis.set(getDelegatedAdminsKey(subredditName), JSON.stringify({
     ownerUsername,
-    delegates: [...new Set(usernames.map((name) => name.trim().toLowerCase()))],
+    delegates,
   }));
 };
 
@@ -249,8 +224,8 @@ app.get('/api/runtime-config', async (c) => {
       postData: context.postData,
       localAdminPostId: await redis.get(ADMIN_POST_KEY) ?? undefined,
     });
-    const adminConfig = await getAdminConfigFromPost(adminPostId);
-    return c.json({ config: effectiveConfig(adminConfig), adminPostId: adminPostId ?? null });
+    const loaded = await getAdminConfigFromPost(adminPostId);
+    return c.json({ config: effectiveConfig(loaded.config), adminPostId: adminPostId ?? null });
   } catch (error) {
     console.error('Failed to load runtime community navigation config', error);
     return c.json({ config: APP_CONFIG, adminPostId: null });
@@ -262,11 +237,13 @@ app.get('/api/admin/config', async (c) => {
     if (!(await requireAdminPanelAccess())) {
       return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
-    const config = await getAdminConfigFromPost(context.postId) ?? getDefaultAdminConfig();
+    const loaded = await getAdminConfigFromPost(context.postId);
+    const config = loaded.config ?? getDefaultAdminConfig();
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
     const isOwner = await isCurrentUserSubredditOwner(subredditName);
     return c.json({
       config,
+      warnings: loaded.warnings,
       targets: await getTargetPosts(),
       adminPostId: context.postId,
       accessLevel: isOwner ? 'topModerator' : 'delegatedModerator',
@@ -284,18 +261,23 @@ app.get('/api/admin/access', async (c) => {
       return c.json({ error: 'Only this subreddit’s top moderator can manage admin access.' }, 403);
     }
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
-    const [moderators, storedDelegates] = await Promise.all([
+    const [moderators, storedDelegates, topModerator] = await Promise.all([
       getModeratorUsernames(subredditName),
       getDelegatedAdminUsernames(subredditName),
+      getTopModeratorUsername(subredditName),
     ]);
+    if (!topModerator) {
+      return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
+    }
     // Prune stale grants during a top-moderator roster refresh. Runtime access
     // checks already deny removed moderators even before this cleanup occurs.
+    // The top moderator is the owner and is never stored as a delegate.
     const currentSet = new Set(moderators);
-    const delegates = storedDelegates.filter((username) => currentSet.has(username));
+    const delegates = storedDelegates.filter((username) => currentSet.has(username) && username !== topModerator);
     if (delegates.length !== storedDelegates.length) {
       await saveDelegatedAdminUsernames(subredditName, delegates);
     }
-    return c.json({ moderators, delegates, scannedAt: Date.now() });
+    return c.json({ moderators, delegates, topModerator, scannedAt: Date.now() });
   } catch (error) {
     console.error('Failed to scan subreddit moderator team', error);
     return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
@@ -309,14 +291,32 @@ app.post('/api/admin/access', async (c) => {
     }
     const payload = await c.req.json<{ username?: string; granted?: boolean }>();
     const username = typeof payload.username === 'string' ? payload.username.trim().replace(/^u\//i, '').toLowerCase() : '';
-    if (!/^[a-z0-9_-]{1,20}$/i.test(username) || typeof payload.granted !== 'boolean') {
+    if (!/^[a-z0-9_-]{3,20}$/i.test(username) || typeof payload.granted !== 'boolean') {
       return c.json({ error: 'Choose a valid moderator and grant or revoke access.' }, 400);
     }
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
-    const moderators = await getModeratorUsernames(subredditName);
+    const [moderators, topModerator] = await Promise.all([
+      getModeratorUsernames(subredditName),
+      getTopModeratorUsername(subredditName),
+    ]);
+    if (!topModerator) {
+      return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
+    }
+    if (username === topModerator) {
+      return c.json({ error: 'The top moderator already has admin access and cannot be added as a delegate.' }, 400);
+    }
     if (!moderators.includes(username)) {
       const current = (await getDelegatedAdminUsernames(subredditName)).filter((name) => name !== username);
       await saveDelegatedAdminUsernames(subredditName, current);
+      if (!payload.granted) {
+        return c.json({
+          ok: true,
+          username,
+          granted: false,
+          delegates: current,
+          message: 'That account is no longer a moderator. Delegated access was removed.',
+        });
+      }
       return c.json({ error: 'That account is not currently a moderator. Access was not granted.' }, 409);
     }
     const current = await getDelegatedAdminUsernames(subredditName);
@@ -353,17 +353,10 @@ app.post('/api/admin/save', async (c) => {
       return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ config: AdminConfig }>();
-    if (!isValidAdminConfig(payload.config)) return c.json({ error: 'Invalid admin configuration.' }, 400);
+    const normalized = normalizeAdminConfig(payload?.config, 'strict');
+    if (!normalized.ok) return c.json({ error: normalized.error }, 400);
 
-    const config: AdminConfig = {
-      ...payload.config,
-      buttons: payload.config.buttons.map((button) => ({
-        ...button,
-        type: 'subreddit',
-        url: getSubredditLink(getSubredditNameFromUrl(button.url)),
-      })),
-      managedSubreddits: [...new Set(payload.config.managedSubreddits.map((name) => normalizeManagedSubredditName(name)!))],
-    };
+    const config = normalized.config;
     const encoded = encodeConfig(config);
     if (JSON.stringify({ portalAdmin: true, portalConfig: encoded }).length > 2000) {
       return c.json({ error: 'Configuration is too large for Reddit post data. Remove unused assets or buttons.' }, 400);
@@ -444,9 +437,9 @@ app.post('/api/admin/save', async (c) => {
       }
     }
 
-    const nextTargets = [...bySub.values()].filter((item) =>
-      config.managedSubreddits.some((name) => name.toLowerCase() === item.subredditName.toLowerCase())
-    );
+    // Keep records for communities that were unselected so adding them again
+    // updates the existing navigation post instead of creating a duplicate.
+    const nextTargets = [...bySub.values()];
     await saveTargetPosts(nextTargets);
     return c.json({ ok: true, config, targets: nextTargets, results });
   } catch (error) {
@@ -457,6 +450,23 @@ app.post('/api/admin/save', async (c) => {
 
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const matchesDeclaredImage = (bytes: Buffer, mimeType: string): boolean => {
+  const mime = mimeType.toLowerCase();
+  if (bytes.length < 12) return false;
+  if (mime === 'image/gif') {
+    const header = bytes.subarray(0, 6).toString('ascii');
+    return header === 'GIF87a' || header === 'GIF89a';
+  }
+  if (mime === 'image/png') {
+    return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  }
+  if (mime === 'image/jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mime === 'image/webp') {
+    return bytes.subarray(0, 4).toString('ascii') === 'RIFF' && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
+  }
+  return false;
+};
 
 const ASSET_MAX_BYTES = 20 * 1024 * 1024;
 const ASSET_CHUNK_MAX_BYTES = 1.5 * 1024 * 1024;
@@ -576,6 +586,10 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
     }
 
     const combined = Buffer.concat(parts, totalBytes);
+    if (!matchesDeclaredImage(combined, meta.mimeType)) {
+      await redis.del(key);
+      return c.json({ error: 'The uploaded file does not match its declared image type.' }, 400);
+    }
     const dataUrl = `data:${meta.mimeType};base64,${combined.toString('base64')}`;
     let lastError: unknown;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -621,6 +635,9 @@ app.post('/api/admin/upload-asset', async (c) => {
     const byteLength = Math.floor((base64.length * 3) / 4) - padding;
     if (byteLength > ASSET_MAX_BYTES) {
       return c.json({ error: 'Reddit media uploads are limited to 20 MB.' }, 413);
+    }
+    if (!matchesDeclaredImage(Buffer.from(base64, 'base64'), match[1])) {
+      return c.json({ error: 'The uploaded file does not match its declared image type.' }, 400);
     }
 
     let lastError: unknown;
@@ -675,16 +692,36 @@ app.post('/api/moderator/create-post', async (c) => {
 });
 
 /*
- * Subreddit moderator menu action.
- *
- * Reddit already restricts this menu item to moderators through
- * devvit.json (forUserType: moderator). Keep this endpoint minimal so
- * the menu request does not perform an unnecessary moderator lookup
- * before submitCustomPost().
- *
  * Menu endpoints return HTTP 200 with a UiResponse on handled errors so
  * the Devvit bridge can display our toast instead of a generic gateway error.
+ * devvit.json can only limit these actions to moderators, so the handlers
+ * repeat the top-moderator or moderator check and fail closed.
  */
+const retargetManagedPosts = async (adminPostId: RedditPostId) => {
+  const targets = await getTargetPosts();
+  for (const target of targets) {
+    try {
+      if (!(await isCurrentUserModerator(target.subredditName))) {
+        console.warn('Skipping managed-post retarget; actor is not a moderator of r/' + target.subredditName);
+        continue;
+      }
+      const post = await reddit.getPostById(target.postId);
+      if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(target.subredditName)) {
+        console.warn('Skipping managed-post retarget; stored post belongs to a different subreddit.', target.postId);
+        continue;
+      }
+      const stored = await reddit.getPostData(target.postId);
+      if (isAdminPanelPostData(stored)) {
+        console.warn('Skipping managed-post retarget; stored post is an admin panel.', target.postId);
+        continue;
+      }
+      await post.setPostData({ portalAdminPostId: adminPostId });
+    } catch (error) {
+      console.warn('Could not retarget managed navigation post', target.postId, error);
+    }
+  }
+};
+
 app.post('/internal/menu/create-admin', async (c) => {
   try {
     await c.req.json<MenuItemRequest>().catch(() => ({}));
@@ -692,6 +729,9 @@ app.post('/internal/menu/create-admin', async (c) => {
     if (!subredditName || !(await isCurrentUserSubredditOwner(subredditName))) {
       return c.json<UiResponse>({ showToast: 'Only this subreddit’s top moderator can create the admin panel.' });
     }
+    // A replacement panel starts blank. Clear grants before the new post exists
+    // so a failed recreate cannot leave the previous delegates authorized.
+    await redis.del(getDelegatedAdminsKey(subredditName));
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
       try {
@@ -713,8 +753,11 @@ app.post('/internal/menu/create-admin', async (c) => {
     });
 
     await redis.set(ADMIN_POST_KEY, post.id);
+    await retargetManagedPosts(post.id);
     console.log('Created admin panel custom post ' + post.id + ' in r/' + subredditName);
-    return c.json<UiResponse>({ showToast: 'Admin panel created in the test subreddit.' });
+    return c.json<UiResponse>({
+      showToast: `Blank admin panel created in r/${subredditName}. Previous delegated access was cleared.`,
+    });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
     return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
@@ -758,7 +801,7 @@ app.post('/internal/menu/create-post', async (c) => {
      * the user open the created post from the subreddit feed.
      */
     return c.json<UiResponse>({
-      showToast: 'Example post created.',
+      showToast: 'Navigation post created.',
     });
   } catch (error) {
     console.error('Failed to create example post from subreddit menu:', error);
