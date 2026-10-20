@@ -68,7 +68,7 @@ for (const path of [
 assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'custom-post menu endpoint must authorize the caller server-side');
 assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the subreddit owner may create the admin panel');
 assert.match(server, /const isCurrentUserSubredditOwner = async/, 'owner check must be implemented server-side');
-assert.match(server, /getModerators\(\)\.all\(\)/, 'owner check must verify the live subreddit moderator order');
+assert.match(server, /getModerators\\(\\)\\.get\\(1\\)/, 'owner check must verify the live subreddit moderator order');
 assert.match(server, /topModerator === username/, 'owner check must compare the caller with the top moderator');
 const adminClient = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
 assert.match(adminClient, /if \(accessDenied\)/, 'unauthorized users must see an access-denied screen instead of the dashboard');
