@@ -63,9 +63,16 @@ for (const path of [
   '/api/admin/upload-asset',
 ]) {
   const method = path === '/api/admin/config' ? 'get' : 'post';
-  assert.match(route(path, method), /requireAdminPanelModerator\(\)/, `${path} must require a valid admin panel and a subreddit moderator`);
+  assert.match(route(path, method), /requireAdminPanelOwner\(\)/, `${path} must require a valid admin panel and the subreddit top moderator`);
 }
 assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'custom-post menu endpoint must authorize the caller server-side');
+assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the subreddit owner may create the admin panel');
+assert.match(server, /const isCurrentUserSubredditOwner = async/, 'owner check must be implemented server-side');
+assert.match(server, /getModerators\(\)\.all\(\)/, 'owner check must verify the live subreddit moderator order');
+assert.match(server, /topModerator === username/, 'owner check must compare the caller with the top moderator');
+const adminClient = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
+assert.match(adminClient, /if \(accessDenied\)/, 'unauthorized users must see an access-denied screen instead of the dashboard');
+assert.match(adminClient, /Owner access required/, 'access-denied screen must explain the owner-only restriction');
 assert.match(route('/api/runtime-config', 'get'), /resolveRuntimeAdminPostId\(/, 'public posts must resolve their explicit source admin pointer');
 assert.match(server, /normalizeSubredditName\(post\.subredditName\)/, 'managed-post updates must verify the target subreddit');
 console.log('COMMUNITY_ISOLATION_TESTS_PASS');
