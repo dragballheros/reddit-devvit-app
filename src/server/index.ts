@@ -549,8 +549,8 @@ app.post('/internal/menu/create-admin', async (c) => {
   try {
     await c.req.json<MenuItemRequest>().catch(() => ({}));
     const { subredditName } = context;
-    if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
-      return c.json<UiResponse>({ showToast: 'Subreddit owner access is required. Only the top moderator can use this dashboard.' });
+    if (!subredditName || !(await isCurrentUserSubredditOwner(subredditName))) {
+      return c.json<UiResponse>({ showToast: 'Only the subreddit owner (top moderator) can create or access the admin dashboard.' });
     }
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
