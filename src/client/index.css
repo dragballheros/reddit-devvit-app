@@ -341,7 +341,6 @@ button { font: inherit; }
   background: rgba(255, 255, 255, 0.34);
 }
 
-.portal-button--electric:hover .portal-button__outline,
 .portal-button--electric:focus-visible .portal-button__outline,
 .portal-button--electric:active .portal-button__outline {
   animation: electric-flicker 180ms linear 1;
@@ -453,7 +452,6 @@ button { font: inherit; }
   display: none;
 }
 
-.portal-button:hover,
 .portal-button:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--portal-accent) 70%, white);
   outline-offset: 2px;

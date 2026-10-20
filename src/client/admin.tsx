@@ -784,7 +784,7 @@ export const AdminApp = () => {
               {welcomeUrls.length > 0 && (
                 <button type="button" className="ghost" onClick={() => setConfig((current) => ({ ...current, welcomeGif: undefined, welcomeGifVariants: [], welcomeGifFitByUrl: {} }))}>Clear Welcome Media</button>
               )}
-              <p className="hint">Add SFW images or GIFs. One is selected at random each time the expanded post loads. A portrait file is set to Side blur and a widescreen file to Top/bottom blur as soon as it is added. Blurred fill follows the frame either way. Remove them all to skip the intro.</p>
+              <p className="hint">Add SFW images or GIFs. One is selected at random each time the post loads, in the feed and again in the expanded view. A portrait file is set to Side blur and a widescreen file to Top/bottom blur as soon as it is added. Blurred fill follows the frame either way. Remove them all to skip the intro.</p>
             </div>
           </div>
         </section>

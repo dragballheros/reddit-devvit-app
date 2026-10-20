@@ -263,10 +263,22 @@ export const MenuApp = () => {
     }
 
     setIsIntroHidden(false);
-    const duration = isMobile ? MOBILE_INTRO_DURATION_MS : INTRO_DURATION_MS;
-    const timer = setTimeout(() => setIsIntroHidden(true), duration);
-    return () => clearTimeout(timer);
-  }, [hasWelcomeGif, isMobile]);
+    let timer: number | undefined;
+    const start = () => {
+      if (timer != null || document.visibilityState === 'hidden') return;
+      const duration = isMobile ? MOBILE_INTRO_DURATION_MS : INTRO_DURATION_MS;
+      timer = window.setTimeout(() => setIsIntroHidden(true), duration);
+    };
+    start();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [hasWelcomeGif, isMobile, mode]);
 
   const portals = useMemo(() => {
     const subredditMenuButton = {
@@ -347,11 +359,70 @@ export const MenuApp = () => {
     <img className="menu__custom-background" src={config.customBackground} alt="" aria-hidden="true" />
   );
 
+  const welcomeIntro = hasWelcomeGif ? (
+    <section className={`intro ${isIntroHidden ? 'intro--hidden' : ''}`}>
+      {blurFrame ? (
+        <div className={`intro__frame intro__frame--${blurModifier}`}>
+          <img
+            className="intro__fill"
+            src={sessionGifSrc}
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            decoding="sync"
+          />
+          <div className="intro__shade" aria-hidden="true" />
+          <img
+            className="intro__media intro__media--contained"
+            src={sessionGifSrc}
+            alt="Welcome animation"
+            loading="eager"
+            decoding="sync"
+            fetchPriority="high"
+            onError={() => setIsIntroHidden(true)}
+          />
+        </div>
+      ) : (
+        <img
+          className="intro__media intro__media--wide"
+          src={sessionGifSrc}
+          alt="Welcome animation"
+          loading="eager"
+          decoding="sync"
+          fetchPriority="high"
+          onError={() => setIsIntroHidden(true)}
+          style={{
+            objectFit: config.introGifFit,
+            ...(sessionGifFit === 'canvas'
+              ? {
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: 'none',
+                  maxHeight: 'none',
+                }
+              : {}),
+          }}
+        />
+      )}
+      <div className="intro__title" aria-label={subredditTitle}>
+        {Array.from(subredditTitle).map((char, index) => (
+          <span
+            key={`${char}-${index}`}
+            className="intro__title-letter"
+            style={{ animationDelay: `${index * 0.06}s` }}
+          >
+            {char === ' ' ? '\u00A0' : char}
+          </span>
+        ))}
+      </div>
+    </section>
+  ) : null;
+
   if (mode === 'inline') {
     const showPager = pageCount > 1;
     return (
       <AppErrorBoundary>
-        <div className={`app app--inline app--ready ${isAndroid ? 'app--android' : ''}`}>
+        <div className={`app app--inline ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
           <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
             <div className="menu__overlay" />
             <div className="menu__content menu__content--inline">
@@ -413,6 +484,7 @@ export const MenuApp = () => {
               </div>
             </div>
           </section>
+          {welcomeIntro}
         </div>
       </AppErrorBoundary>
     );
@@ -439,65 +511,7 @@ export const MenuApp = () => {
           </div>
         </div>
       </section>
-
-      {hasWelcomeGif && (
-        <section className={`intro ${isIntroHidden ? 'intro--hidden' : ''}`}>
-          {blurFrame ? (
-            <div className={`intro__frame intro__frame--${blurModifier}`}>
-              <img
-                className="intro__fill"
-                src={sessionGifSrc}
-                alt=""
-                aria-hidden="true"
-                loading="eager"
-                decoding="sync"
-              />
-              <div className="intro__shade" aria-hidden="true" />
-              <img
-                className="intro__media intro__media--contained"
-                src={sessionGifSrc}
-                alt="Welcome animation"
-                loading="eager"
-                decoding="sync"
-                fetchPriority="high"
-                onError={() => setIsIntroHidden(true)}
-              />
-            </div>
-          ) : (
-            <img
-              className="intro__media intro__media--wide"
-              src={sessionGifSrc}
-              alt="Welcome animation"
-              loading="eager"
-              decoding="sync"
-              fetchPriority="high"
-              onError={() => setIsIntroHidden(true)}
-              style={{
-                objectFit: config.introGifFit,
-                ...(sessionGifFit === 'canvas'
-                  ? {
-                      width: '100%',
-                      height: '100%',
-                      maxWidth: 'none',
-                      maxHeight: 'none',
-                    }
-                  : {}),
-              }}
-            />
-          )}
-          <div className="intro__title" aria-label={subredditTitle}>
-            {Array.from(subredditTitle).map((char, index) => (
-              <span
-                key={`${char}-${index}`}
-                className="intro__title-letter"
-                style={{ animationDelay: `${index * 0.06}s` }}
-              >
-                {char === ' ' ? '\u00A0' : char}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
+      {welcomeIntro}
       </div>
     </AppErrorBoundary>
   );
