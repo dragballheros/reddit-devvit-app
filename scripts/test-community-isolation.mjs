@@ -68,7 +68,7 @@ for (const path of [
 assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'custom-post menu endpoint must authorize the caller server-side');
 assert.match(route('/api/admin/access', 'get'), /requireAdminPanelOwner\(\)/, 'only the top moderator may scan the moderator roster');
 assert.match(route('/api/admin/access'), /requireAdminPanelOwner\(\)/, 'only the top moderator may grant or revoke access');
-assert.match(server, /getModerators\\(\\)\\.all\\(\\)/, 'delegation must scan the full live moderator-team listing');
+assert.ok(server.includes('const moderators = await subreddit.getModerators().all()'), 'delegation must scan the full live moderator-team listing');
 assert.match(server, /getDelegatedAdminUsernames\(subredditName\)/, 'admin access must consult the subreddit-scoped delegation list');
 assert.match(server, /record\.ownerUsername !== liveOwner/, 'delegated grants must be invalidated when the top moderator changes');
 assert.match(server, /await isCurrentUserModerator\(subredditName\)/, 'delegated access must revalidate live moderator status on every admin request');
