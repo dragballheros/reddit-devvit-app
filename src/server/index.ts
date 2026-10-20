@@ -125,13 +125,24 @@ const getCurrentUsername = async (): Promise<string | undefined> => {
 const getDelegatedAdminsKey = (subredditName: string) =>
   `${DELEGATED_ADMINS_PREFIX}${normalizeSubredditName(subredditName)}`;
 
+const getTopModeratorUsername = async (subredditName: string): Promise<string | undefined> => {
+  const subreddit = await reddit.getSubredditByName(subredditName);
+  const moderators = await subreddit.getModerators().get(1);
+  return moderators[0]?.username?.trim().toLowerCase() || undefined;
+};
+
 const getDelegatedAdminUsernames = async (subredditName: string): Promise<string[]> => {
   const raw = await redis.get(getDelegatedAdminsKey(subredditName));
   if (!raw) return [];
   try {
     const value: unknown = JSON.parse(raw);
-    if (!Array.isArray(value)) return [];
-    return [...new Set(value.filter((name): name is string =>
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    const record = value as { ownerUsername?: unknown; delegates?: unknown };
+    // Grants belong to the top moderator who issued them. A top-mod change
+    // invalidates all previous grants until the new top moderator re-approves.
+    const liveOwner = await getTopModeratorUsername(subredditName);
+    if (!liveOwner || record.ownerUsername !== liveOwner || !Array.isArray(record.delegates)) return [];
+    return [...new Set(record.delegates.filter((name): name is string =>
       typeof name === 'string' && /^[a-z0-9_-]{1,20}$/i.test(name)
     ).map((name) => name.trim().toLowerCase()))];
   } catch {
@@ -139,8 +150,17 @@ const getDelegatedAdminUsernames = async (subredditName: string): Promise<string
   }
 };
 
-const saveDelegatedAdminUsernames = async (subredditName: string, usernames: string[]) =>
-  redis.set(getDelegatedAdminsKey(subredditName), JSON.stringify([...new Set(usernames.map((name) => name.trim().toLowerCase()))]));
+const saveDelegatedAdminUsernames = async (subredditName: string, usernames: string[]) => {
+  const ownerUsername = await getTopModeratorUsername(subredditName);
+  if (!ownerUsername) {
+    await redis.del(getDelegatedAdminsKey(subredditName));
+    return;
+  }
+  return redis.set(getDelegatedAdminsKey(subredditName), JSON.stringify({
+    ownerUsername,
+    delegates: [...new Set(usernames.map((name) => name.trim().toLowerCase()))],
+  }));
+};
 
 /** Returns the current live moderator roster. Fail closed on API errors. */
 const getModeratorUsernames = async (subredditName: string): Promise<string[]> => {
@@ -172,9 +192,7 @@ const isCurrentUserSubredditOwner = async (subredditName: string): Promise<boole
   try {
     const username = await getCurrentUsername();
     if (!username) return false;
-    const subreddit = await reddit.getSubredditByName(subredditName);
-    const moderators = await subreddit.getModerators().get(1);
-    const topModerator = moderators[0]?.username?.trim().toLowerCase();
+    const topModerator = await getTopModeratorUsername(subredditName);
     return Boolean(topModerator && topModerator === username);
   } catch (error) {
     console.warn('Could not verify subreddit top moderator; denying owner-only action.', error);
