@@ -387,9 +387,9 @@ button { font: inherit; }
 .portal-button__icon-shell {
   position: relative;
   z-index: 6;
-  flex: 0 0 clamp(52px, 7.4vw, 78px);
-  width: clamp(52px, 7.4vw, 78px);
-  height: clamp(52px, 7.4vw, 78px);
+  flex: 0 0 clamp(68px, 10vw, 96px);
+  width: clamp(68px, 10vw, 96px);
+  height: clamp(68px, 10vw, 96px);
   margin: 0 clamp(14px, 2vw, 24px);
   display: grid;
   place-items: center;
@@ -738,11 +738,11 @@ button { font: inherit; }
   }
 
   .portal-button__icon-shell {
-    flex-basis: 52px;
-    width: 52px;
-    height: 52px;
-    margin-left: 9px;
-    margin-right: 12px;
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    margin-left: 8px;
+    margin-right: 10px;
   }
 
   .portal-button__label {
@@ -898,11 +898,13 @@ button { font: inherit; }
 }
 
 .app--inline .portal-button__icon-shell {
-  flex-basis: 44px;
-  width: 44px;
-  height: 44px;
-  margin-left: 10px;
-  margin-right: 12px;
+  flex: 0 1 auto;
+  width: auto;
+  height: 78%;
+  aspect-ratio: 1;
+  max-height: 76px;
+  margin-left: 8px;
+  margin-right: 10px;
 }
 
 .app--inline .portal-button__label { font-size: 1rem; }

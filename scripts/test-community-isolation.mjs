@@ -396,6 +396,8 @@ assert.match(menuUi, /app app--expanded /);
 assert.match(menuUi, /app app--inline \$\{isIntroHidden \? 'app--ready' : 'app--intro'\}/);
 const inlineBranch = menuUi.slice(menuUi.indexOf("if (mode === 'inline')"), menuUi.indexOf('app app--expanded'));
 assert.match(inlineBranch, /\{welcomeIntro\}/);
+assert.match(menuCss, /\.app--inline \.portal-button__icon-shell \{[^}]*max-height:\s*76px/);
+assert.doesNotMatch(menuCss, /flex-basis:\s*44px/);
 assert.doesNotMatch(menuCss, /\.portal-button:hover/);
 assert.doesNotMatch(menuCss, /\.portal-button--electric:hover/);
 assert.doesNotMatch(menuUi, /Play audio|Mute audio|<audio|profile-card|app--profile/);
