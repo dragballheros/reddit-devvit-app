@@ -63,8 +63,19 @@ for (const path of [
   '/api/admin/upload-asset',
 ]) {
   const method = path === '/api/admin/config' ? 'get' : 'post';
-  assert.match(route(path, method), /requireAdminPanelOwner\(\)/, `${path} must require the canonical admin panel and this subreddit’s top moderator`);
+  assert.match(route(path, method), /requireAdminPanelAccess\(\)/, `${path} must require the canonical admin panel and owner-or-delegated access`);
 }
+for (const path of [
+  '/api/admin/access/scan',
+  '/api/admin/access/grant',
+  '/api/admin/access/revoke',
+]) {
+  assert.match(route(path), /requireAdminPanelOwner\(\)/, `${path} must remain top-moderator-only`);
+}
+assert.match(server, /const getCurrentModeratorUsernames = async/, 'delegation must use a live subreddit moderator scan');
+assert.match(server, /syncDelegatedAdmins\(panel\.subredditName\)/, 'delegated access must be reconciled against current moderators');
+assert.match(route('/api/admin/access/grant'), /access\.moderators\.includes\(username\)/, 'grant must reject users who are not current moderators');
+assert.match(route('/api/admin/access/revoke'), /getDelegatedAdminUsernames\(\)/, 'top moderator must be able to revoke a delegation');
 assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'creating a public navigation post must still require moderator access');
 assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the subreddit top moderator may create or replace the admin panel');
 assert.match(server, /const isCurrentUserSubredditOwner = async/, 'owner authorization must be checked server-side');
@@ -73,6 +84,9 @@ assert.match(server, /postId !== canonicalAdminPostId/, 'stale or alternate admi
 assert.match(server, /normalizeSubredditName\(post\.subredditName\)/, 'admin and managed-post updates must verify subreddit ownership');
 const adminClient = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
 assert.match(adminClient, /if \(accessDenied\)/, 'unauthorized users must see an access-denied screen');
-assert.match(adminClient, /Top moderator access required/, 'access-denied screen must explain the owner-only restriction');
+assert.match(adminClient, /Dashboard access required/, 'access-denied screen must explain the access restriction');
+assert.match(adminClient, /Grant Dashboard Access/, 'top moderator must have a UI to grant access to scanned moderators');
+assert.match(adminClient, /Scan Moderator Team/, 'top moderator must be able to scan the live moderator team');
+assert.match(adminClient, /Revoke/, 'top moderator must be able to revoke delegated access');
 assert.match(route('/api/runtime-config', 'get'), /resolveRuntimeAdminPostId\(/, 'public posts must resolve their explicit source admin pointer');
 console.log('COMMUNITY_ISOLATION_TESTS_PASS');
