@@ -1,19 +1,20 @@
 # Community Navigation for Reddit
 
-Community Navigation is a reusable Reddit Devvit custom post intended to help members find and navigate between subreddits. Each participating community's moderators control the subreddit destinations and presentation configured for their community. The app does not decide which communities should be recommended, and ordinary members do not control a community's configuration.
+Community Navigation is a reusable Reddit Devvit custom post intended to help members find and navigate between subreddits. Each participating community's top moderator owns that community's navigation dashboard and controls who else may edit it. The top moderator can explicitly grant dashboard access to selected members of that same subreddit’s current moderator team. Ordinary members and moderators without a grant cannot change the dashboard, and being a moderator in another subreddit does not grant access.
 
 **This app is for Safe for Work (SFW) use only. NSFW content and destinations are not allowed.** The app and its configuration must comply with the current Devvit Rules and all other applicable Reddit policies.
 
 ## What the app provides
 
-- A moderator-only **Community Navigation Admin** panel.
+- A **Community Navigation Admin** panel owned by the current subreddit’s top moderator, with optional delegated access for specifically approved moderators.
 - A configurable navigation page for subreddit destinations.
 - A built-in **Subreddit Menu** button that automatically opens the installed subreddit’s `/about/` page.
 - Customizable button labels and appearance, including colors, gradients, icons, and backgrounds.
 - Optional welcome GIFs and a reusable asset library for uploaded images.
 - Placeholder buttons (**Subreddit 1** through **Subreddit 4**) when no destinations have been configured.
-- Moderator actions for creating a navigation post and creating or recreating the configuration panel.
-- Managed subreddit support, allowing moderators to create or update navigation posts in other subreddits where the app is installed and they have the required permissions.
+- A top-moderator-only action for creating or recreating the configuration panel.
+- Live moderator-team scanning and top-moderator-controlled grants/revocations for delegated dashboard access.
+- Managed subreddit support, allowing the source dashboard’s top moderator or a delegated editor to create or update navigation posts only in target subreddits where the acting user also has moderator permissions and the app is installed.
 
 The app is community-configured. A fresh installation has no community-specific destinations or media. Uploaded media uses Reddit/Devvit's media pipeline.
 
@@ -35,13 +36,26 @@ Read the current [Devvit Rules](https://developers.reddit.com/docs/devvit_rules)
 
 ### 1. Create the admin panel
 
-Install or playtest the app in a subreddit you moderate.
+Install or playtest the app in a subreddit where you are the top moderator.
 
-From the app's custom-post menu, choose **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one.
+From the app's custom-post menu, the subreddit’s **top moderator** chooses **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one. Recreating the panel invalidates previous delegated grants.
 
-The admin panel is accessed from the app's own custom-post menu. Reddit profile pinning is not performed automatically. Moderators can use Reddit's normal post pin controls if they want the configuration post pinned.
+The admin panel is accessed from the app's own custom-post menu. Only the top moderator can create or replace the panel and manage delegated access. The top moderator and moderators explicitly granted access can read and change the dashboard. The server verifies the canonical admin post and checks authorization on every admin request. Reddit profile pinning is not performed automatically.
 
-Each subreddit installation has its own Redis-backed configuration and admin panel. A panel in one subreddit does not grant administrative access to another community's panel. If you select a managed subreddit, the app creates or updates only its own navigation post there, after checking that the requesting user is a moderator in that target community and that the app has the required installation/permissions. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel.
+Each subreddit installation has its own Redis-backed configuration, canonical admin panel, and delegated-access list. A panel in one subreddit does not grant administrative access to another community's panel. If an authorized dashboard editor selects a managed subreddit, the app creates or updates only its own navigation post there, after checking that the acting user is a moderator in that target community and that the app has the required installation/permissions. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel.
+
+### 1A. Grant dashboard access to other moderators
+
+Only the current subreddit’s top moderator can manage delegated access.
+
+1. Open the canonical **Community Navigation Admin** panel.
+2. In **Moderator Access**, choose **Scan Mod Team** to load the live moderator roster from Reddit.
+3. Find the moderator who needs access and choose **Grant Access** next to their username.
+4. To remove access, choose **Revoke Access** next to that username.
+
+Grants apply only to this subreddit’s admin dashboard. A delegated moderator can edit the dashboard and its assets, but cannot grant or revoke access or create/replace the admin panel. A moderator in a target subreddit does not gain access to the source dashboard simply by being a moderator there.
+
+**Automatic loss of access:** Every admin request checks the user's current moderator status against Reddit. If a delegated user is removed from the moderator team, access is denied immediately even if the stored grant has not yet been cleaned up. **Scan Mod Team** refreshes the roster and removes grants for accounts that are no longer moderators. Grants are tied to the top moderator who issued them; if the top moderator changes, the old grants are invalidated and the new top moderator must approve delegates again. If Reddit cannot confirm current permissions, the app fails closed.
 
 ### 2. Configure the welcome screen
 
@@ -83,7 +97,7 @@ Use **Delete** in the Asset Library to remove an asset from the app configuratio
 
 Click **Save & Apply**.
 
-The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the moderator must have the necessary moderation permissions there. Configure only SFW subreddit destinations.
+The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the acting dashboard editor must also have moderator permissions there. Configure only SFW subreddit destinations.
 
 ### 6. Create a standalone test post
 
@@ -114,15 +128,20 @@ Moderators are responsible for the destinations and media they configure. The ap
 
 Before using the app in a community:
 
-1. Create the admin panel in a subreddit you moderate.
-2. Configure only SFW subreddit destinations.
-3. Add and remove SFW welcome media.
-4. Add, edit, and remove subreddit buttons using valid direct Reddit subreddit URLs.
-5. Confirm an external URL, Reddit post URL, or profile URL is rejected by validation.
-6. Confirm the fixed Subreddit Menu button opens the current subreddit’s `/about/` page and cannot be customized.
-7. Upload and delete an asset, confirming references are cleared.
-8. Save and apply the configuration.
-9. Create a standalone test navigation post.
-10. Refresh the navigation post and confirm the saved configuration persists.
-11. Test mobile and web layouts.
-12. Confirm all displayed destinations and media comply with the current Devvit Rules and Reddit policies.
+1. Create the admin panel as the subreddit’s top moderator.
+2. Scan the moderator team and grant access to a current moderator.
+3. Confirm an ordinary moderator without a grant is denied dashboard access.
+4. Remove a delegated user from the moderator team and confirm access is denied immediately.
+5. Scan the moderator team and confirm the stale grant is removed.
+6. Confirm a top-moderator change invalidates previous grants.
+7. Configure only SFW subreddit destinations.
+8. Add and remove SFW welcome media.
+9. Add, edit, and remove subreddit buttons using valid direct Reddit subreddit URLs.
+10. Confirm an external URL, Reddit post URL, or profile URL is rejected by validation.
+11. Confirm the fixed Subreddit Menu button opens the current subreddit’s `/about/` page and cannot be customized.
+12. Upload and delete an asset, confirming references are cleared.
+13. Save and apply the configuration.
+14. Create a standalone test navigation post.
+15. Refresh the navigation post and confirm the saved configuration persists.
+16. Test mobile and web layouts.
+17. Confirm all displayed destinations and media comply with the current Devvit Rules and Reddit policies.
