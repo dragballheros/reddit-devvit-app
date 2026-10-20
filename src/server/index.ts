@@ -149,12 +149,19 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
  * ordered moderator listing. Fail closed if Reddit cannot confirm the list.
  */
 const isCurrentUserSubredditOwner = async (subredditName: string): Promise<boolean> => {
-  const username = context.username?.trim().toLowerCase();
-  if (!username) return false;
-
   try {
+    const currentUser = context.userId
+      ? await reddit.getUserById(context.userId)
+      : context.username
+        ? await reddit.getUserByUsername(context.username)
+        : undefined;
+    const username = (currentUser?.username ?? context.username)?.trim().toLowerCase();
+    if (!username) return false;
+
     const subreddit = await reddit.getSubredditByName(subredditName);
-    const moderators = await subreddit.getModerators().all();
+    // Only fetch the first row: Reddit's moderator listing is ordered with the
+    // top moderator first, so there is no need to download the full mod list.
+    const moderators = await subreddit.getModerators().get(1);
     const topModerator = moderators[0]?.username?.trim().toLowerCase();
     return Boolean(topModerator && topModerator === username);
   } catch (error) {
