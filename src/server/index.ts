@@ -159,24 +159,88 @@ const isCurrentUserSubredditOwner = async (subredditName: string): Promise<boole
  * A stale panel, a target navigation post, or a post from another subreddit
  * cannot be used as an alternate write surface.
  */
-const requireAdminPanelOwner = async (): Promise<boolean> => {
+const DELEGATED_ADMINS_KEY = 'community-portal:delegated-admins';
+
+const currentUsername = async (): Promise<string | undefined> => {
+  const user = context.userId
+    ? await reddit.getUserById(context.userId)
+    : context.username
+      ? await reddit.getUserByUsername(context.username)
+      : undefined;
+  const username = (user?.username ?? context.username)?.trim().toLowerCase();
+  return username || undefined;
+};
+
+/** Read the live moderator list. Reddit returns the top moderator first. */
+const getCurrentModeratorUsernames = async (subredditName: string): Promise<string[]> => {
+  const subreddit = await reddit.getSubredditByName(subredditName);
+  const moderators = await subreddit.getModerators().get(100);
+  return [...new Set(moderators
+    .map((moderator) => moderator.username?.trim().toLowerCase())
+    .filter((username): username is string => Boolean(username)))];
+};
+
+const getDelegatedAdminUsernames = async (): Promise<string[]> => {
+  const raw = await redis.get(DELEGATED_ADMINS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return [...new Set(parsed.filter((name): name is string =>
+      typeof name === 'string' && /^[a-z0-9_-]{2,20}$/.test(name.trim().toLowerCase())
+    ).map((name) => name.trim().toLowerCase()))];
+  } catch {
+    return [];
+  }
+};
+
+const saveDelegatedAdminUsernames = async (usernames: string[]) =>
+  redis.set(DELEGATED_ADMINS_KEY, JSON.stringify([...new Set(usernames.map((name) => name.trim().toLowerCase()))]));
+
+/** Remove any delegated account no longer present in the live subreddit moderator list. */
+const syncDelegatedAdmins = async (subredditName: string): Promise<{ moderators: string[]; delegatedUsers: string[]; revokedUsers: string[] }> => {
+  const moderators = await getCurrentModeratorUsernames(subredditName);
+  const previous = await getDelegatedAdminUsernames();
+  const topModerator = moderators[0];
+  const delegatedUsers = previous.filter((username) => moderators.includes(username) && username !== topModerator);
+  const revokedUsers = previous.filter((username) => !delegatedUsers.includes(username));
+  if (JSON.stringify(previous) !== JSON.stringify(delegatedUsers)) await saveDelegatedAdminUsernames(delegatedUsers);
+  return { moderators, delegatedUsers, revokedUsers };
+};
+
+const requireCanonicalAdminPanel = async (): Promise<{ subredditName: string; postId: RedditPostId } | undefined> => {
   const postId = toRedditPostId(context.postId);
   const subredditName = normalizeManagedSubredditName(context.subredditName);
   const canonicalAdminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
-  if (
-    !postId ||
-    !subredditName ||
-    postId !== canonicalAdminPostId ||
-    !isAdminPanelPostData(context.postData) ||
-    !(await isCurrentUserSubredditOwner(subredditName))
-  ) return false;
-
+  if (!postId || !subredditName || postId !== canonicalAdminPostId || !isAdminPanelPostData(context.postData)) return undefined;
   try {
     const post = await reddit.getPostById(postId);
-    if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) return false;
+    if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) return undefined;
     const storedData = await reddit.getPostData(postId);
-    return isAdminPanelPostData(storedData);
+    if (!isAdminPanelPostData(storedData)) return undefined;
+    return { subredditName, postId };
   } catch {
+    return undefined;
+  }
+};
+
+const requireAdminPanelOwner = async (): Promise<boolean> => {
+  const panel = await requireCanonicalAdminPanel();
+  return Boolean(panel && await isCurrentUserSubredditOwner(panel.subredditName));
+};
+
+/** The owner or an explicitly delegated user who is still a live moderator may edit the dashboard. */
+const requireAdminPanelAccess = async (): Promise<boolean> => {
+  const panel = await requireCanonicalAdminPanel();
+  if (!panel) return false;
+  if (await isCurrentUserSubredditOwner(panel.subredditName)) return true;
+  try {
+    const username = await currentUsername();
+    if (!username) return false;
+    const { moderators, delegatedUsers } = await syncDelegatedAdmins(panel.subredditName);
+    return moderators.includes(username) && delegatedUsers.includes(username);
+  } catch (error) {
+    console.warn('Could not verify delegated dashboard access; denying access.', error);
     return false;
   }
 };
@@ -198,11 +262,13 @@ app.get('/api/runtime-config', async (c) => {
 
 app.get('/api/admin/config', async (c) => {
   try {
-    if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Dashboard access required.' }, 403);
     }
     const config = await getAdminConfigFromPost(context.postId) ?? getDefaultAdminConfig();
-    return c.json({ config, targets: await getTargetPosts(), adminPostId: context.postId });
+    const isOwner = await isCurrentUserSubredditOwner(context.subredditName!);
+    const access = isOwner ? await syncDelegatedAdmins(context.subredditName!) : { moderators: [], delegatedUsers: [], revokedUsers: [] };
+    return c.json({ config, targets: await getTargetPosts(), adminPostId: context.postId, isOwner, moderators: access.moderators, delegatedUsers: access.delegatedUsers });
   } catch (error) {
     console.error('Failed to load admin config', error);
     return c.json({ error: 'Failed to load admin configuration.' }, 500);
@@ -225,10 +291,57 @@ app.get('/api/moderator-status', async (c) => {
   }
 });
 
+app.post('/api/admin/access/scan', async (c) => {
+  try {
+    if (!(await requireAdminPanelOwner())) return c.json({ error: 'Only this subreddit’s top moderator can manage dashboard access.' }, 403);
+    const subredditName = normalizeManagedSubredditName(context.subredditName);
+    if (!subredditName) return c.json({ error: 'Subreddit context is missing.' }, 400);
+    const access = await syncDelegatedAdmins(subredditName);
+    return c.json({ ...access });
+  } catch (error) {
+    console.error('Failed to scan moderator team', error);
+    return c.json({ error: 'Could not scan the live moderator team. No access grants were changed.' }, 500);
+  }
+});
+
+app.post('/api/admin/access/grant', async (c) => {
+  try {
+    if (!(await requireAdminPanelOwner())) return c.json({ error: 'Only this subreddit’s top moderator can grant dashboard access.' }, 403);
+    const subredditName = normalizeManagedSubredditName(context.subredditName);
+    if (!subredditName) return c.json({ error: 'Subreddit context is missing.' }, 400);
+    const payload = await c.req.json<{ username?: string }>();
+    const username = typeof payload.username === 'string' ? payload.username.trim().toLowerCase() : '';
+    if (!/^[a-z0-9_-]{2,20}$/.test(username)) return c.json({ error: 'Choose a valid Reddit username from the scanned moderator team.' }, 400);
+    const access = await syncDelegatedAdmins(subredditName);
+    if (!access.moderators.includes(username)) return c.json({ error: 'That user is not currently a moderator here. Access was not granted.' }, 403);
+    if (access.moderators[0] === username) return c.json({ error: 'The top moderator already has owner access.' }, 400);
+    const delegatedUsers = [...new Set([...access.delegatedUsers, username])];
+    await saveDelegatedAdminUsernames(delegatedUsers);
+    return c.json({ ok: true, moderators: access.moderators, delegatedUsers });
+  } catch (error) {
+    console.error('Failed to grant dashboard access', error);
+    return c.json({ error: 'Could not grant dashboard access.' }, 500);
+  }
+});
+
+app.post('/api/admin/access/revoke', async (c) => {
+  try {
+    if (!(await requireAdminPanelOwner())) return c.json({ error: 'Only this subreddit’s top moderator can revoke dashboard access.' }, 403);
+    const payload = await c.req.json<{ username?: string }>();
+    const username = typeof payload.username === 'string' ? payload.username.trim().toLowerCase() : '';
+    const delegatedUsers = (await getDelegatedAdminUsernames()).filter((name) => name !== username);
+    await saveDelegatedAdminUsernames(delegatedUsers);
+    return c.json({ ok: true, delegatedUsers });
+  } catch (error) {
+    console.error('Failed to revoke dashboard access', error);
+    return c.json({ error: 'Could not revoke dashboard access.' }, 500);
+  }
+});
+
 app.post('/api/admin/save', async (c) => {
   try {
-    if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Dashboard access required.' }, 403);
     }
     const payload = await c.req.json<{ config: AdminConfig }>();
     if (!isValidAdminConfig(payload.config)) return c.json({ error: 'Invalid admin configuration.' }, 400);
@@ -350,8 +463,8 @@ const isUploadId = (value?: string): boolean =>
 
 app.post('/api/admin/upload-asset/chunk', async (c) => {
   try {
-    if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Dashboard access required.' }, 403);
     }
 
     const payload = await c.req.json<{
@@ -413,8 +526,8 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
 
 app.post('/api/admin/upload-asset/finalize', async (c) => {
   try {
-    if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Dashboard access required.' }, 403);
     }
 
     const payload = await c.req.json<{ uploadId?: string }>();
@@ -481,8 +594,8 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
 
 app.post('/api/admin/upload-asset', async (c) => {
   try {
-    if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Dashboard access required.' }, 403);
     }
 
     const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
@@ -592,7 +705,7 @@ app.post('/internal/menu/create-admin', async (c) => {
 
     await redis.set(ADMIN_POST_KEY, post.id);
     console.log('Created admin panel custom post ' + post.id + ' in r/' + subredditName);
-    return c.json<UiResponse>({ showToast: 'Admin panel created. Only this subreddit’s top moderator can edit it.' });
+    return c.json<UiResponse>({ showToast: 'Admin panel created. The top moderator can grant dashboard access to other current moderators.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
     return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
