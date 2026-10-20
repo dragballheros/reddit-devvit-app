@@ -63,9 +63,16 @@ for (const path of [
   '/api/admin/upload-asset',
 ]) {
   const method = path === '/api/admin/config' ? 'get' : 'post';
-  assert.match(route(path, method), /requireAdminPanelModerator\(\)/, `${path} must require a valid admin panel and a subreddit moderator`);
+  assert.match(route(path, method), /requireAdminPanelOwner\(\)/, `${path} must require the canonical admin panel and this subreddit’s top moderator`);
 }
-assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'custom-post menu endpoint must authorize the caller server-side');
+assert.match(route('/internal/menu/create-post'), /isCurrentUserModerator\(subredditName\)/, 'creating a public navigation post must still require moderator access');
+assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the subreddit top moderator may create or replace the admin panel');
+assert.match(server, /const isCurrentUserSubredditOwner = async/, 'owner authorization must be checked server-side');
+assert.match(server, /getModerators\(\)\.get\(1\)/, 'owner authorization must check the live top moderator');
+assert.match(server, /postId !== canonicalAdminPostId/, 'stale or alternate admin posts must not authorize writes');
+assert.match(server, /normalizeSubredditName\(post\.subredditName\)/, 'admin and managed-post updates must verify subreddit ownership');
+const adminClient = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
+assert.match(adminClient, /if \(accessDenied\)/, 'unauthorized users must see an access-denied screen');
+assert.match(adminClient, /Top moderator access required/, 'access-denied screen must explain the owner-only restriction');
 assert.match(route('/api/runtime-config', 'get'), /resolveRuntimeAdminPostId\(/, 'public posts must resolve their explicit source admin pointer');
-assert.match(server, /normalizeSubredditName\(post\.subredditName\)/, 'managed-post updates must verify the target subreddit');
 console.log('COMMUNITY_ISOLATION_TESTS_PASS');
