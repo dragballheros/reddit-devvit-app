@@ -4,8 +4,6 @@ on:
     branches: [main, communitypro, fix/community-scoped-admin-authorization-20261019]
   pull_request:
     branches: [main, communitypro]
-  pull_request:
-    branches: [main]
 jobs:
   validate:
     runs-on: ubuntu-latest
