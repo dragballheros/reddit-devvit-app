@@ -17,6 +17,10 @@ Community Navigation is a reusable Reddit Devvit custom post intended to help me
 
 The app is community-configured. A fresh installation has no community-specific destinations or media. Uploaded media uses Reddit/Devvit's media pipeline.
 
+## Official community
+
+The project’s designated home and support subreddit is **r/communitypro_dev**. It is also the default Devvit playtest subreddit in `devvit.json`. This identifies the project’s home community but does not lock installations to that subreddit; every installed community has its own owner-only admin panel and configuration. The subreddit’s public/private visibility is controlled in Reddit’s subreddit settings, not by this repository.
+
 ## Intended use and community control
 
 Community Navigation is a general-purpose subreddit navigation utility, not an endorsement of any particular community or an advertising tool for external platforms.
