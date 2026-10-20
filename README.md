@@ -1,19 +1,19 @@
 # Community Navigation for Reddit
 
-Community Navigation is a reusable Reddit Devvit custom post intended to help members find and navigate between subreddits. Each participating community's moderators control the subreddit destinations and presentation configured for their community. The app does not decide which communities should be recommended, and ordinary members do not control a community's configuration.
+Community Navigation is a reusable Reddit Devvit custom post intended to help members find and navigate between subreddits. Each participating community's top moderator controls that community's navigation dashboard and presentation. Ordinary members and other moderators cannot change the dashboard, and being a moderator in another subreddit does not grant access.
 
 **This app is for Safe for Work (SFW) use only. NSFW content and destinations are not allowed.** The app and its configuration must comply with the current Devvit Rules and all other applicable Reddit policies.
 
 ## What the app provides
 
-- A moderator-only **Community Navigation Admin** panel.
+- A **Community Navigation Admin** panel restricted to the current subreddit’s top moderator.
 - A configurable navigation page for subreddit destinations.
 - A built-in **Subreddit Menu** button that automatically opens the installed subreddit’s `/about/` page.
 - Customizable button labels and appearance, including colors, gradients, icons, and backgrounds.
 - Optional welcome GIFs and a reusable asset library for uploaded images.
 - Placeholder buttons (**Subreddit 1** through **Subreddit 4**) when no destinations have been configured.
 - Moderator actions for creating a navigation post and creating or recreating the configuration panel.
-- Managed subreddit support, allowing moderators to create or update navigation posts in other subreddits where the app is installed and they have the required permissions.
+- Managed subreddit support, allowing the source subreddit’s top moderator to create or update navigation posts only in target subreddits where they also have moderator permissions and the app is installed.
 
 The app is community-configured. A fresh installation has no community-specific destinations or media. Uploaded media uses Reddit/Devvit's media pipeline.
 
@@ -37,11 +37,11 @@ Read the current [Devvit Rules](https://developers.reddit.com/docs/devvit_rules)
 
 Install or playtest the app in a subreddit you moderate.
 
-From the app's custom-post menu, choose **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one.
+From the app's custom-post menu, the subreddit’s **top moderator** chooses **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one. The app defines its dashboard owner as the first moderator returned by Reddit’s live moderator list; if that check fails, access is denied.
 
-The admin panel is accessed from the app's own custom-post menu. Reddit profile pinning is not performed automatically. Moderators can use Reddit's normal post pin controls if they want the configuration post pinned.
+The admin panel is accessed from the app's own custom-post menu. Only that subreddit’s top moderator can create, read, or change the dashboard. The server checks the live moderator list and verifies that the opened post is the canonical admin post for that installation on every admin endpoint. Stale admin panels and managed public posts cannot be used as alternate admin entry points. Reddit profile pinning is not performed automatically.
 
-Each subreddit installation has its own Redis-backed configuration and admin panel. A panel in one subreddit does not grant administrative access to another community's panel. If you select a managed subreddit, the app creates or updates only its own navigation post there, after checking that the requesting user is a moderator in that target community and that the app has the required installation/permissions. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel.
+Each subreddit installation has its own Redis-backed configuration and canonical admin panel. A panel in one subreddit does not grant administrative access to another community's panel. If the top moderator selects a managed subreddit, the app creates or updates only its own navigation post there, after checking that the requesting top moderator is also a moderator in that target community and that the app is installed there. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel. A target post cannot be used to change the source panel or another target.
 
 ### 2. Configure the welcome screen
 
@@ -83,7 +83,7 @@ Use **Delete** in the Asset Library to remove an asset from the app configuratio
 
 Click **Save & Apply**.
 
-The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the moderator must have the necessary moderation permissions there. Configure only SFW subreddit destinations.
+The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the dashboard’s top moderator must also be a moderator there. Configure only SFW subreddit destinations.
 
 ### 6. Create a standalone test post
 
