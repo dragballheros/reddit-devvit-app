@@ -20,7 +20,8 @@ import {
 import { useWebViewMode } from './useWebViewMode';
 
 type TargetRecord = { subredditName: string; postId: string };
-type AccessLevel = 'topModerator' | 'delegatedModerator';
+type AccessLevel = 'everything' | 'delegatedModerator';
+type ModeratorRosterEntry = { username: string; everything: boolean };
 type CommunityRole = 'home' | 'connected';
 
 type CommunityRecord = {
@@ -154,19 +155,17 @@ export const AdminApp = () => {
   const [connecting, setConnecting] = useState(false);
   const [newSubreddit, setNewSubreddit] = useState('');
   const [accessLevel, setAccessLevel] = useState<AccessLevel>('delegatedModerator');
-  const [moderators, setModerators] = useState<string[]>([]);
+  const [moderators, setModerators] = useState<ModeratorRosterEntry[]>([]);
   const [delegates, setDelegates] = useState<string[]>([]);
-  const [topModerator, setTopModerator] = useState('');
   const [accessRefreshing, setAccessRefreshing] = useState(false);
   const [accessSaving, setAccessSaving] = useState<string | null>(null);
 
   const refreshModeratorRoster = async () => {
     setAccessRefreshing(true);
     try {
-      const data = await api<{ moderators: string[]; delegates: string[]; topModerator?: string }>('/api/admin/access');
+      const data = await api<{ moderators: ModeratorRosterEntry[]; delegates: string[] }>('/api/admin/access');
       setModerators(data.moderators ?? []);
       setDelegates(data.delegates ?? []);
-      setTopModerator((data.topModerator ?? '').toLowerCase());
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Could not scan the live moderator team.');
     } finally {
@@ -441,7 +440,7 @@ export const AdminApp = () => {
 
   const save = async () => {
     if (!canEditSelected) {
-      showToast(`Could not confirm that you are the live top moderator of r/${selected}. No changes were made.`);
+      showToast(`Could not confirm that you have the Everything moderator permission in r/${selected}. No changes were made.`);
       return;
     }
     const invalidButton = config.buttons.find((button) => (
@@ -539,7 +538,7 @@ export const AdminApp = () => {
       return;
     }
     if (!canEditSelected) {
-      showToast(`Could not confirm that you are the live top moderator of r/${selected}. No changes were made.`);
+      showToast(`Could not confirm that you have the Everything moderator permission in r/${selected}. No changes were made.`);
       return;
     }
     setPasteConfirm(true);
@@ -583,7 +582,7 @@ export const AdminApp = () => {
             <div>
               <p className="eyebrow">Moderator Configuration</p>
               <h1>Community Navigation Admin</h1>
-              <p className="hint">Open the expanded editor to scroll the dashboard. Only this subreddit’s top moderator, or a moderator they explicitly grant, can change it.</p>
+              <p className="hint">Open the expanded editor to scroll the dashboard. Only a moderator with Everything in this subreddit, or a moderator they explicitly grant, can change it.</p>
             </div>
           </header>
           <section className="section">
@@ -614,7 +613,7 @@ export const AdminApp = () => {
             <div>
               <p className="eyebrow">Access restricted</p>
               <h1>Admin access required</h1>
-              <p className="hint">Only the top moderator of this subreddit can open this dashboard, unless they have explicitly granted access to another current moderator. Being a moderator somewhere else does not grant access here.</p>
+              <p className="hint">Only a moderator with Everything in this subreddit can open this dashboard, unless a moderator with Everything has explicitly granted access to another current moderator. Being a moderator somewhere else does not grant access here.</p>
             </div>
           </header>
           <section className="section">
@@ -664,7 +663,7 @@ export const AdminApp = () => {
           <div>
             <p className="eyebrow">Moderator Configuration</p>
             <h1>Community Navigation Admin</h1>
-            <p className="hint">Each connected subreddit keeps its own navigation. Use Editing to switch, then save only that community. {accessLevel === 'topModerator' ? 'You are the top moderator of this community.' : 'You have delegated access from the top moderator of this community.'}</p>
+            <p className="hint">Each connected subreddit keeps its own navigation. Use Editing to switch, then save only that community. {accessLevel === 'everything' ? 'You have the Everything moderator permission in this community.' : 'You have delegated access from a moderator with Everything.'}</p>
           </div>
           <button type="button" className="primary" onClick={() => void save()} disabled={saving || !canEditSelected}>{saving ? 'Applying…' : `Save & Apply to r/${selected}`}</button>
         </header>
@@ -683,7 +682,7 @@ export const AdminApp = () => {
                     ? `r/${community.subredditName} (this community)`
                     : community.canEdit
                       ? `r/${community.subredditName}`
-                      : `r/${community.subredditName} (top moderator only)`}
+                      : `r/${community.subredditName} (Everything only)`}
                 </option>
               ))}
             </select>
@@ -708,7 +707,7 @@ export const AdminApp = () => {
             <input value={newSubreddit} onChange={(event) => setNewSubreddit(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void connectSubreddit(); }} placeholder="Subreddit name, e.g. YourSubreddit" />
             <button type="button" className="secondary" onClick={() => void connectSubreddit()} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Subreddit'}</button>
           </div>
-          <p className="hint">Type a subreddit name and choose Connect Subreddit. Reddit does not provide a list of communities you moderate, so the server checks the name: the app must already be installed there, and you must be its live top moderator. Connecting copies this community’s saved configuration, not unsaved edits. Save this community first if the new post should start from changes you have not saved yet.</p>
+          <p className="hint">Type a subreddit name and choose Connect Subreddit. Reddit does not provide a list of communities you moderate, so the server checks the name: the app must already be installed there, and you must have the Everything moderator permission there. Connecting copies this community’s saved configuration, not unsaved edits. Save this community first if the new post should start from changes you have not saved yet.</p>
           <p className="hint">Choose Editing to switch communities. Copy Config keeps the configuration on screen, including unsaved edits. Select another community, choose Paste Config, then Replace Config to overwrite it. Disconnect removes a community from this panel and keeps its navigation post.</p>
           {selectedCommunity?.followsHome && selected !== homeSubreddit && (
             <p className="hint">r/{selected} still shows this community’s saved configuration. Saving stores an independent copy on its navigation post.</p>
@@ -722,7 +721,7 @@ export const AdminApp = () => {
         </section>
         {canReadSelected ? (
         <fieldset className="editor-lock" disabled={!canEditSelected}>
-        {!canEditSelected && <p className="hint">You can copy this configuration. Only the live top moderator of r/{selected} can change or publish it.</p>}
+        {!canEditSelected && <p className="hint">You can copy this configuration. Only a moderator with Everything in r/{selected} can change or publish it.</p>}
         <section className="section">
           <div className="section-title"><h2>Welcome Screen</h2><span>{welcomeUrls.length} item{welcomeUrls.length === 1 ? '' : 's'}</span></div>
           <div className="upload-row">
@@ -915,30 +914,28 @@ export const AdminApp = () => {
         ) : (
           <section className="section">
             <h2>Configuration hidden</h2>
-            <p className="hint">Only the live top moderator of r/{selected} can view this configuration.</p>
+            <p className="hint">Only a moderator with Everything in r/{selected} can view this configuration.</p>
           </section>
         )}
-        {accessLevel === 'topModerator' ? (
+        {accessLevel === 'everything' ? (
           <section className="section">
             <div className="section-title">
               <h2>Moderator Access</h2>
               <button type="button" className="secondary" onClick={() => void refreshModeratorRoster()} disabled={accessRefreshing}>{accessRefreshing ? 'Scanning…' : 'Scan Mod Team'}</button>
             </div>
-            <p className="hint">Only the top moderator can grant or revoke admin access. The live moderator list is checked before every grant, and a moderator who leaves the team loses access immediately. Replacing this panel clears every grant.</p>
+            <p className="hint">Only a moderator with Everything can grant or revoke admin access. The live moderator list is checked before every grant, and a moderator who leaves the team loses access immediately. Replacing this panel clears every grant. Several moderators can have Everything, and any of them can change grants.</p>
             <div className="moderator-access-list">
-              {moderators.map((username) => {
-                const normalized = username.toLowerCase();
-                const isOwner = normalized === topModerator;
-                const granted = delegates.includes(normalized);
+              {moderators.map((moderator) => {
+                const granted = delegates.includes(moderator.username);
                 return (
-                  <div className="moderator-access-row" key={username}>
+                  <div className="moderator-access-row" key={moderator.username}>
                     <div>
-                      <strong>u/{username}</strong>
-                      <small>{isOwner ? 'Top moderator · owner' : granted ? 'Delegated admin' : 'Moderator'}</small>
+                      <strong>u/{moderator.username}</strong>
+                      <small>{moderator.everything ? 'Everything' : granted ? 'Delegated admin' : 'Moderator'}</small>
                     </div>
-                    {isOwner ? <span className="owner-pill">Full access</span> : (
-                      <button type="button" className={granted ? 'danger' : 'secondary'} onClick={() => void setModeratorAccess(username, !granted)} disabled={accessSaving === username || accessRefreshing}>
-                        {accessSaving === username ? 'Saving…' : granted ? 'Revoke Access' : 'Grant Access'}
+                    {moderator.everything ? <span className="owner-pill">Everything</span> : (
+                      <button type="button" className={granted ? 'danger' : 'secondary'} onClick={() => void setModeratorAccess(moderator.username, !granted)} disabled={accessSaving === moderator.username || accessRefreshing}>
+                        {accessSaving === moderator.username ? 'Saving…' : granted ? 'Revoke Access' : 'Grant Access'}
                       </button>
                     )}
                   </div>
@@ -950,7 +947,7 @@ export const AdminApp = () => {
         ) : (
           <section className="section">
             <div className="section-title"><h2>Moderator Access</h2><span>Delegated</span></div>
-            <p className="hint">The top moderator granted you portal access. Reddit moderator status is rechecked on every admin request. If you leave the moderator team, or the top moderator changes, this access stops.</p>
+            <p className="hint">A moderator with Everything granted you portal access. Reddit moderator status is rechecked on every admin request. If you leave the moderator team, or the grant is revoked, this access stops.</p>
           </section>
         )}
         <footer className="footer">

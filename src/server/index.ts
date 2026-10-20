@@ -103,10 +103,11 @@ const getCurrentUsername = async (): Promise<string | undefined> => {
 const getDelegatedAdminsKey = (subredditName: string) =>
   `${DELEGATED_ADMINS_PREFIX}${normalizeSubredditName(subredditName)}`;
 
-const getTopModeratorUsername = async (subredditName: string): Promise<string | undefined> => {
-  const subreddit = await reddit.getSubredditByName(subredditName);
-  const moderators = await subreddit.getModerators().get(1);
-  return moderators[0]?.username?.trim().toLowerCase() || undefined;
+const readDelegateNames = (delegates: unknown): string[] => {
+  if (!Array.isArray(delegates)) return [];
+  return [...new Set(delegates.filter((name): name is string =>
+    typeof name === 'string' && /^[a-z0-9_-]{3,20}$/i.test(name)
+  ).map((name) => name.trim().toLowerCase()))];
 };
 
 const getDelegatedAdminUsernames = async (subredditName: string): Promise<string[]> => {
@@ -115,43 +116,49 @@ const getDelegatedAdminUsernames = async (subredditName: string): Promise<string
   try {
     const value: unknown = JSON.parse(raw);
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-    const record = value as { ownerUsername?: unknown; delegates?: unknown };
-    // Grants belong to the top moderator who issued them. A top-mod change
-    // invalidates all previous grants until the new top moderator re-approves.
-    const liveOwner = await getTopModeratorUsername(subredditName);
-    if (!liveOwner || record.ownerUsername !== liveOwner || !Array.isArray(record.delegates)) return [];
-    return [...new Set(record.delegates.filter((name): name is string =>
-      typeof name === 'string' && /^[a-z0-9_-]{3,20}$/i.test(name)
-    ).map((name) => name.trim().toLowerCase()))];
+    // Grants are a shared list. They are not tied to one moderator, because
+    // several moderators may have Everything at the same time.
+    return readDelegateNames((value as { delegates?: unknown }).delegates);
   } catch {
     return [];
   }
 };
 
 const saveDelegatedAdminUsernames = async (subredditName: string, usernames: string[]) => {
-  const ownerUsername = await getTopModeratorUsername(subredditName);
-  if (!ownerUsername) {
-    await redis.del(getDelegatedAdminsKey(subredditName));
-    return;
+  const delegates = readDelegateNames(usernames);
+  return redis.set(getDelegatedAdminsKey(subredditName), JSON.stringify({ delegates }));
+};
+
+type ModeratorRosterEntry = { username: string; everything: boolean };
+
+/**
+ * Full live moderator roster with each account's Everything flag.
+ * Returns undefined when the listing or any permission set cannot be verified.
+ */
+const getModeratorRoster = async (subredditName: string): Promise<ModeratorRosterEntry[] | undefined> => {
+  try {
+    const subreddit = await reddit.getSubredditByName(subredditName);
+    const moderators = await subreddit.getModerators().all();
+    const roster = new Map<string, ModeratorRosterEntry>();
+    for (const moderator of moderators) {
+      const username = moderator.username?.trim().toLowerCase();
+      const permissions = moderator.moderatorInfo?.modPermissions;
+      if (!username || !Array.isArray(permissions)) return undefined;
+      const existing = roster.get(username);
+      roster.set(username, {
+        username,
+        everything: Boolean(existing?.everything || permissions.includes('all')),
+      });
+    }
+    return roster.size > 0 ? [...roster.values()] : undefined;
+  } catch (error) {
+    console.warn('Could not verify the live moderator team.', error);
+    return undefined;
   }
-  const delegates = [...new Set(usernames.map((name) => name.trim().toLowerCase()))]
-    .filter((name) => name !== ownerUsername && /^[a-z0-9_-]{3,20}$/i.test(name));
-  return redis.set(getDelegatedAdminsKey(subredditName), JSON.stringify({
-    ownerUsername,
-    delegates,
-  }));
 };
 
-/** Returns the current live moderator roster. Fail closed on API errors. */
-const getModeratorUsernames = async (subredditName: string): Promise<string[]> => {
-  const subreddit = await reddit.getSubredditByName(subredditName);
-  const moderators = await subreddit.getModerators().all();
-  return [...new Set(moderators
-    .map((moderator) => moderator.username?.trim().toLowerCase())
-    .filter((username): username is string => Boolean(username)))];
-};
-
-const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
+/** Live permissions for the acting user. Undefined means the check failed closed. */
+const getCurrentUserModPermissions = async (subredditName: string): Promise<string[] | undefined> => {
   try {
     const user =
       context.userId
@@ -159,25 +166,24 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
         : context.username
           ? await reddit.getUserByUsername(context.username)
           : undefined;
-    if (!user) return false;
+    if (!user) return undefined;
     const permissions = await user.getModPermissionsForSubreddit(subredditName);
-    return permissions.length > 0;
-  } catch {
-    return false;
+    return Array.isArray(permissions) ? permissions : undefined;
+  } catch (error) {
+    console.warn('Could not verify moderator permissions; denying the action.', error);
+    return undefined;
   }
 };
 
-/** Reddit's first listed moderator is treated as the top moderator for this app. */
-const isCurrentUserSubredditOwner = async (subredditName: string): Promise<boolean> => {
-  try {
-    const username = await getCurrentUsername();
-    if (!username) return false;
-    const topModerator = await getTopModeratorUsername(subredditName);
-    return Boolean(topModerator && topModerator === username);
-  } catch (error) {
-    console.warn('Could not verify subreddit top moderator; denying owner-only action.', error);
-    return false;
-  }
+const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
+  const permissions = await getCurrentUserModPermissions(subredditName);
+  return Boolean(permissions && permissions.length > 0);
+};
+
+/** Reddit's Everything moderator permission is the permission named "all". */
+const isCurrentUserEverythingModerator = async (subredditName: string): Promise<boolean> => {
+  const permissions = await getCurrentUserModPermissions(subredditName);
+  return Boolean(permissions?.includes('all'));
 };
 
 /**
@@ -200,22 +206,22 @@ const isCanonicalAdminPanelContext = async (): Promise<boolean> => {
   }
 };
 
-/** Only the top moderator can manage delegated admin grants. */
+/** Only a moderator with Everything can manage delegated admin grants. */
 const requireAdminPanelOwner = async (): Promise<boolean> => {
   const subredditName = normalizeManagedSubredditName(context.subredditName);
-  return Boolean(subredditName && await isCanonicalAdminPanelContext() && await isCurrentUserSubredditOwner(subredditName));
+  return Boolean(subredditName && await isCanonicalAdminPanelContext() && await isCurrentUserEverythingModerator(subredditName));
 };
 
 /**
- * Top moderator or explicitly delegated moderator may configure the portal.
- * A delegate is checked against Reddit's live moderator permissions on every
- * request, so a removed moderator loses access immediately even if a stale
- * grant remains in Redis.
+ * A moderator with Everything, or an explicitly delegated moderator, may
+ * configure the portal. A delegate is checked against Reddit's live moderator
+ * permissions on every request, so a removed moderator loses access immediately
+ * even if a stale grant remains in Redis.
  */
 const requireAdminPanelAccess = async (): Promise<boolean> => {
   const subredditName = normalizeManagedSubredditName(context.subredditName);
   if (!subredditName || !(await isCanonicalAdminPanelContext())) return false;
-  if (await isCurrentUserSubredditOwner(subredditName)) return true;
+  if (await isCurrentUserEverythingModerator(subredditName)) return true;
   if (!(await isCurrentUserModerator(subredditName))) return false;
   const username = await getCurrentUsername();
   if (!username) return false;
@@ -244,8 +250,8 @@ const buildTargetPostData = (adminPostId: RedditPostId, config: AdminConfig) => 
   return JSON.stringify(postData).length > POST_DATA_LIMIT ? undefined : postData;
 };
 
-const topModeratorError = (subredditName: string) =>
-  `Could not confirm that you are the live top moderator of r/${subredditName}. No changes were made.`;
+const everythingPermissionError = (subredditName: string) =>
+  `Could not confirm that you have the Everything moderator permission in r/${subredditName}. No changes were made.`;
 
 type CommunityRole = 'home' | 'connected';
 
@@ -277,7 +283,7 @@ const loadCanonicalAdminPost = async () => {
 
 /**
  * Copy the current home configuration onto legacy navigation posts that still
- * follow this panel. Only the live top moderator of a target can write it.
+ * follow this panel. Only a moderator with Everything on a target can write it.
  * Posts that already store their own configuration are left unchanged.
  */
 const snapshotLegacyTargets = async (sourceConfig: AdminConfig, adminPostId: RedditPostId): Promise<Set<string>> => {
@@ -287,7 +293,7 @@ const snapshotLegacyTargets = async (sourceConfig: AdminConfig, adminPostId: Red
   for (const target of targets) {
     if (!connected.has(target.subredditName.toLowerCase())) continue;
     try {
-      if (!(await isCurrentUserSubredditOwner(target.subredditName))) continue;
+      if (!(await isCurrentUserEverythingModerator(target.subredditName))) continue;
       const post = await reddit.getPostById(target.postId);
       if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(target.subredditName)) continue;
       const stored = await reddit.getPostData(target.postId);
@@ -333,7 +339,7 @@ const collectCommunities = async (
       continue;
     }
 
-    const canEdit = await isCurrentUserSubredditOwner(name);
+    const canEdit = await isCurrentUserEverythingModerator(name);
     const canRead = isHomeOwner || canEdit;
     const record = bySub.get(name);
     let followsHome = true;
@@ -400,12 +406,12 @@ app.get('/api/runtime-config', async (c) => {
 app.get('/api/admin/config', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
     const loaded = await getAdminConfigFromPost(context.postId);
     const config = loaded.config ?? getDefaultAdminConfig();
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
-    const isOwner = await isCurrentUserSubredditOwner(subredditName);
+    const isOwner = await isCurrentUserEverythingModerator(subredditName);
     const adminPostId = toRedditPostId(context.postId)!;
     const communities = (await collectCommunities(config, subredditName, isOwner, adminPostId))
       .map((community) => community.role === 'home' ? { ...community, warnings: loaded.warnings } : community);
@@ -415,7 +421,7 @@ app.get('/api/admin/config', async (c) => {
       warnings: loaded.warnings,
       targets: await getTargetPosts(),
       adminPostId: context.postId,
-      accessLevel: isOwner ? 'topModerator' : 'delegatedModerator',
+      accessLevel: isOwner ? 'everything' : 'delegatedModerator',
       canManageAccess: isOwner,
       homeSubreddit: subredditName,
       communities,
@@ -429,26 +435,32 @@ app.get('/api/admin/config', async (c) => {
 app.get('/api/admin/access', async (c) => {
   try {
     if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Only this subreddit’s top moderator can manage admin access.' }, 403);
+      return c.json({ error: 'Only a moderator with Everything in this subreddit can manage admin access.' }, 403);
     }
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
-    const [moderators, storedDelegates, topModerator] = await Promise.all([
-      getModeratorUsernames(subredditName),
+    const [roster, storedDelegates] = await Promise.all([
+      getModeratorRoster(subredditName),
       getDelegatedAdminUsernames(subredditName),
-      getTopModeratorUsername(subredditName),
     ]);
-    if (!topModerator) {
+    if (!roster) {
       return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
     }
-    // Prune stale grants during a top-moderator roster refresh. Runtime access
-    // checks already deny removed moderators even before this cleanup occurs.
-    // The top moderator is the owner and is never stored as a delegate.
-    const currentSet = new Set(moderators);
-    const delegates = storedDelegates.filter((username) => currentSet.has(username) && username !== topModerator);
+    // Prune grants for accounts that left the team or now have Everything.
+    // Runtime access checks already deny removed moderators before this cleanup.
+    // Moderators with Everything already have access and are never stored as delegates.
+    const current = new Map(roster.map((moderator) => [moderator.username, moderator]));
+    const delegates = storedDelegates.filter((username) => {
+      const moderator = current.get(username);
+      return Boolean(moderator && !moderator.everything);
+    });
     if (delegates.length !== storedDelegates.length) {
       await saveDelegatedAdminUsernames(subredditName, delegates);
     }
-    return c.json({ moderators, delegates, topModerator, scannedAt: Date.now() });
+    return c.json({
+      moderators: roster,
+      delegates,
+      scannedAt: Date.now(),
+    });
   } catch (error) {
     console.error('Failed to scan subreddit moderator team', error);
     return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
@@ -458,7 +470,7 @@ app.get('/api/admin/access', async (c) => {
 app.post('/api/admin/access', async (c) => {
   try {
     if (!(await requireAdminPanelOwner())) {
-      return c.json({ error: 'Only this subreddit’s top moderator can grant or revoke admin access.' }, 403);
+      return c.json({ error: 'Only a moderator with Everything in this subreddit can grant or revoke admin access.' }, 403);
     }
     const payload = await c.req.json<{ username?: string; granted?: boolean }>();
     const username = typeof payload.username === 'string' ? payload.username.trim().replace(/^u\//i, '').toLowerCase() : '';
@@ -466,17 +478,20 @@ app.post('/api/admin/access', async (c) => {
       return c.json({ error: 'Choose a valid moderator and grant or revoke access.' }, 400);
     }
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
-    const [moderators, topModerator] = await Promise.all([
-      getModeratorUsernames(subredditName),
-      getTopModeratorUsername(subredditName),
-    ]);
-    if (!topModerator) {
+    const roster = await getModeratorRoster(subredditName);
+    if (!roster) {
       return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
     }
-    if (username === topModerator) {
-      return c.json({ error: 'The top moderator already has admin access and cannot be added as a delegate.' }, 400);
+    const moderator = roster.find((entry) => entry.username === username);
+    if (moderator?.everything) {
+      if (!payload.granted) {
+        const current = (await getDelegatedAdminUsernames(subredditName)).filter((name) => name !== username);
+        await saveDelegatedAdminUsernames(subredditName, current);
+        return c.json({ ok: true, username, granted: false, delegates: current });
+      }
+      return c.json({ error: 'A moderator with Everything already has admin access and cannot be added as a delegate.' }, 400);
     }
-    if (!moderators.includes(username)) {
+    if (!moderator) {
       const current = (await getDelegatedAdminUsernames(subredditName)).filter((name) => name !== username);
       await saveDelegatedAdminUsernames(subredditName, current);
       if (!payload.granted) {
@@ -523,8 +538,8 @@ const writeConnectedConfig = async (
   config: AdminConfig,
   adminPostId: RedditPostId,
 ): Promise<{ error: string; status: 400 | 403 | 404 | 409 } | { ok: true }> => {
-  if (!(await isCurrentUserSubredditOwner(subredditName))) {
-    return { error: topModeratorError(subredditName), status: 403 };
+  if (!(await isCurrentUserEverythingModerator(subredditName))) {
+    return { error: everythingPermissionError(subredditName), status: 403 };
   }
   const targets = await getTargetPosts();
   const current = targets.find((item) => item.subredditName === subredditName);
@@ -550,7 +565,7 @@ const writeConnectedConfig = async (
 app.post('/api/admin/save', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ subredditName?: string; config: AdminConfig }>();
     const normalized = normalizeAdminConfig(payload?.config, 'strict');
@@ -576,8 +591,8 @@ app.post('/api/admin/save', async (c) => {
     if (!stored.managedSubreddits.includes(requested)) {
       return c.json({ error: `r/${requested} is not connected to this panel.` }, 400);
     }
-    if (!(await isCurrentUserSubredditOwner(requested))) {
-      return c.json({ error: topModeratorError(requested) }, 403);
+    if (!(await isCurrentUserEverythingModerator(requested))) {
+      return c.json({ error: everythingPermissionError(requested) }, 403);
     }
     const written = await writeConnectedConfig(requested, normalized.config, adminPostId);
     if ('error' in written) return c.json({ error: written.error }, written.status);
@@ -591,7 +606,7 @@ app.post('/api/admin/save', async (c) => {
 app.post('/api/admin/connect', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ subredditName?: string }>();
     const subredditName = normalizeManagedSubredditName(payload?.subredditName);
@@ -604,8 +619,8 @@ app.post('/api/admin/connect', async (c) => {
     if (subredditName === homeName) {
       return c.json({ error: 'This community is already in the editor. Choose it under Editing.' }, 400);
     }
-    if (!(await isCurrentUserSubredditOwner(subredditName))) {
-      return c.json({ error: topModeratorError(subredditName) }, 403);
+    if (!(await isCurrentUserEverythingModerator(subredditName))) {
+      return c.json({ error: everythingPermissionError(subredditName) }, 403);
     }
 
     const stored = (await getAdminConfigFromPost(adminPostId)).config ?? getDefaultAdminConfig();
@@ -649,7 +664,7 @@ app.post('/api/admin/connect', async (c) => {
       } catch (error) {
         console.error('Failed to create connected navigation post', subredditName, error);
         return c.json({
-          error: `The app must be installed in r/${subredditName}, and you must be its live top moderator. No navigation post was created.`,
+          error: `The app must be installed in r/${subredditName}, and you must have the Everything moderator permission there. No navigation post was created.`,
         }, 403);
       }
     }
@@ -673,7 +688,7 @@ app.post('/api/admin/connect', async (c) => {
 app.post('/api/admin/disconnect', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ subredditName?: string }>();
     const subredditName = normalizeManagedSubredditName(payload?.subredditName);
@@ -697,9 +712,9 @@ app.post('/api/admin/disconnect', async (c) => {
         }
         const storedTarget = await reddit.getPostData(record.postId);
         if (!isAdminPanelPostData(storedTarget) && !readOwnSubredditConfigPayload(storedTarget)) {
-          if (!(await isCurrentUserSubredditOwner(subredditName))) {
+          if (!(await isCurrentUserEverythingModerator(subredditName))) {
             return c.json({
-              error: `Could not confirm that you are the live top moderator of r/${subredditName}. Disconnect was refused so r/${subredditName} keeps its current navigation.`,
+              error: `Could not confirm that you have the Everything moderator permission in r/${subredditName}. Disconnect was refused so r/${subredditName} keeps its current navigation.`,
             }, 403);
           }
           const postData = buildTargetPostData(adminPostId, stored);
@@ -730,7 +745,7 @@ app.post('/api/admin/disconnect', async (c) => {
 app.post('/api/admin/paste', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ sourceSubreddit?: string; targetSubreddit?: string; config: AdminConfig }>();
     const normalized = normalizeAdminConfig(payload?.config, 'strict');
@@ -750,16 +765,16 @@ app.post('/api/admin/paste', async (c) => {
     if (!known.has(sourceSubreddit) || !known.has(targetSubreddit)) {
       return c.json({ error: 'Copy and paste only work between this community and connected subreddits.' }, 400);
     }
-    const isHomeOwner = await isCurrentUserSubredditOwner(homeName);
+    const isHomeOwner = await isCurrentUserEverythingModerator(homeName);
     const sourceReadable = sourceSubreddit === homeName
       || isHomeOwner
-      || await isCurrentUserSubredditOwner(sourceSubreddit);
+      || await isCurrentUserEverythingModerator(sourceSubreddit);
     if (!sourceReadable) {
       return c.json({ error: `You cannot copy the configuration for r/${sourceSubreddit}.` }, 403);
     }
-    const targetEditable = targetSubreddit === homeName || await isCurrentUserSubredditOwner(targetSubreddit);
+    const targetEditable = targetSubreddit === homeName || await isCurrentUserEverythingModerator(targetSubreddit);
     if (!targetEditable) {
-      return c.json({ error: topModeratorError(targetSubreddit) }, 403);
+      return c.json({ error: everythingPermissionError(targetSubreddit) }, 403);
     }
 
     if (targetSubreddit === homeName) {
@@ -817,7 +832,7 @@ const isUploadId = (value?: string): boolean =>
 app.post('/api/admin/upload-asset/chunk', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{
@@ -880,7 +895,7 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
 app.post('/api/admin/upload-asset/finalize', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{ uploadId?: string }>();
@@ -952,7 +967,7 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
 app.post('/api/admin/upload-asset', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
@@ -1002,7 +1017,7 @@ app.post('/api/moderator/create-post', async (c) => {
   try {
     const subredditName = context.subredditName;
     if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
-      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+      return c.json({ error: 'Everything moderator permission or delegated moderator access required.' }, 403);
     }
 
     const adminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
@@ -1035,8 +1050,8 @@ const retargetManagedPosts = async (adminPostId: RedditPostId) => {
   const targets = await getTargetPosts();
   for (const target of targets) {
     try {
-      if (!(await isCurrentUserSubredditOwner(target.subredditName))) {
-        console.warn('Skipping managed-post retarget; actor is not the live top moderator of r/' + target.subredditName);
+      if (!(await isCurrentUserEverythingModerator(target.subredditName))) {
+        console.warn('Skipping managed-post retarget; actor does not have Everything in r/' + target.subredditName);
         continue;
       }
       const post = await reddit.getPostById(target.postId);
@@ -1075,8 +1090,8 @@ app.post('/internal/menu/create-admin', async (c) => {
   try {
     await c.req.json<MenuItemRequest>().catch(() => ({}));
     const { subredditName } = context;
-    if (!subredditName || !(await isCurrentUserSubredditOwner(subredditName))) {
-      return c.json<UiResponse>({ showToast: 'Only this subreddit’s top moderator can create the admin panel.' });
+    if (!subredditName || !(await isCurrentUserEverythingModerator(subredditName))) {
+      return c.json<UiResponse>({ showToast: 'Only a moderator with Everything in this subreddit can create the admin panel.' });
     }
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {

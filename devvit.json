@@ -5,14 +5,12 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "inline": true,
         "entry": "splash.html",
-        "height": "tall"
+        "height": "regular"
       },
       "admin": {
         "entry": "admin.html",
-        "height": "tall",
-        "inline": true
+        "height": "regular"
       }
     }
   },
@@ -31,7 +29,7 @@
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create or replace this subreddit's admin panel. Top moderator only; delegated access is cleared.",
+        "description": "Create or replace this subreddit's admin panel. Requires the Everything moderator permission; delegated access is cleared.",
         "location": "post",
         "forUserType": "moderator",
         "postFilter": "currentApp",
