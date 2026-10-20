@@ -88,6 +88,17 @@ export const isAdminPanelPostData = (value: unknown): boolean =>
   );
 
 /**
+ * A navigation post that stores its own configuration. Admin panels are excluded
+ * so a panel never renders as a target snapshot of itself.
+ */
+export const readOwnSubredditConfigPayload = (postData: unknown): string | undefined => {
+  if (!postData || typeof postData !== 'object' || Array.isArray(postData)) return undefined;
+  const data = postData as Record<string, unknown>;
+  if (data.portalSubredditConfig !== true || data.portalAdmin === true) return undefined;
+  return typeof data.portalConfig === 'string' && data.portalConfig.length > 0 ? data.portalConfig : undefined;
+};
+
+/**
  * Resolve the admin configuration for the current custom post.
  * Admin panels use their own post data; managed public posts follow their
  * server-written portalAdminPostId; legacy local posts fall back to this

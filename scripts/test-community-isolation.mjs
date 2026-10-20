@@ -8,6 +8,7 @@ import {
   isRedditHostedMediaUrl,
   normalizeAdminConfig,
   normalizeManagedSubredditName,
+  readOwnSubredditConfigPayload,
   resolveRuntimeAdminPostId,
 } from '../src/shared/subreddit.ts';
 
@@ -16,6 +17,18 @@ assert.equal(isAdminPanelPostData({ portalAdmin: false, portalConfig: 'compresse
 assert.equal(isAdminPanelPostData({ portalConfig: 'compressed' }), false);
 assert.equal(isAdminPanelPostData(null), false);
 assert.equal(isAdminPanelPostData('portalAdmin'), false);
+
+assert.equal(readOwnSubredditConfigPayload({
+  portalSubredditConfig: true,
+  portalAdminPostId: 't3_admin',
+  portalConfig: 'encoded-config',
+}), 'encoded-config');
+assert.equal(readOwnSubredditConfigPayload({ portalAdmin: true, portalSubredditConfig: true, portalConfig: 'encoded-config' }), undefined);
+assert.equal(readOwnSubredditConfigPayload({ portalAdminPostId: 't3_admin', portalConfig: 'encoded-config' }), undefined);
+assert.equal(readOwnSubredditConfigPayload({ portalSubredditConfig: true, portalConfig: '' }), undefined);
+assert.equal(readOwnSubredditConfigPayload({ portalSubredditConfig: true, portalConfig: 12 }), undefined);
+assert.equal(readOwnSubredditConfigPayload(null), undefined);
+assert.equal(readOwnSubredditConfigPayload(['portalSubredditConfig']), undefined);
 
 assert.equal(
   resolveRuntimeAdminPostId({
@@ -79,8 +92,19 @@ assert.match(server, /record\.ownerUsername !== liveOwner/, 'delegated grants mu
 assert.match(server, /await isCurrentUserModerator\(subredditName\)/, 'delegated access must revalidate live moderator status on every admin request');
 assert.match(route('/internal/menu/create-admin'), /isCurrentUserSubredditOwner\(subredditName\)/, 'only the top moderator may create or replace the admin panel');
 
-assert.match(route('/api/runtime-config', 'get'), /resolveRuntimeAdminPostId\(/, 'public posts must resolve their explicit source admin pointer');
+assert.match(route('/api/runtime-config', 'get'), /readOwnSubredditConfigPayload\(/, 'a navigation post with its own configuration must not follow the shared panel');
+assert.match(route('/api/runtime-config', 'get'), /resolveRuntimeAdminPostId\(/, 'legacy public posts still resolve their source admin pointer');
 assert.doesNotMatch(route('/api/runtime-config', 'get'), /delegate|managedSubreddits|requireAdminPanelAccess/, 'public runtime config must not expose admin access or managed-subreddit records');
+assert.match(route('/api/admin/save'), /isCurrentUserSubredditOwner\(/, 'publishing a connected subreddit requires its live top moderator');
+assert.doesNotMatch(route('/api/admin/save'), /isCurrentUserModerator\(/, 'connected subreddits are not editable by any moderator');
+assert.doesNotMatch(route('/api/admin/save'), /setPostData\(\{\s*portalAdminPostId:\s*adminPostId\s*\}\)/, 'saving must not replace every target with one shared pointer');
+assert.match(route('/api/admin/connect'), /requireAdminPanelAccess\(\)/);
+assert.match(route('/api/admin/connect'), /isCurrentUserSubredditOwner\(/, 'connecting a subreddit requires its live top moderator');
+assert.match(route('/api/admin/disconnect'), /requireAdminPanelAccess\(\)/);
+assert.match(route('/api/admin/disconnect'), /isCurrentUserSubredditOwner\(/, 'disconnect refuses to drop a shared link unless the target top moderator can freeze it');
+assert.match(route('/api/admin/paste'), /requireAdminPanelAccess\(\)/);
+assert.match(route('/api/admin/paste'), /normalizeAdminConfig\(payload\?\.config, 'strict'\)/, 'pasted configurations use the same server-side checks as saves');
+assert.match(route('/api/admin/paste'), /isCurrentUserSubredditOwner\(/, 'pasting into a connected subreddit requires its live top moderator');
 assert.match(server, /normalizeSubredditName\(post\.subredditName\)/, 'managed-post updates must verify the target subreddit');
 assert.match(route('/api/admin/save'), /normalizeAdminConfig\(payload\?\.config, 'strict'\)/, 'saves must reject unsafe configuration before writing');
 assert.match(route('/internal/menu/create-admin'), /redis\.del\(getDelegatedAdminsKey\(subredditName\)\)/, 'replacing the admin panel must clear delegated grants');
@@ -180,6 +204,13 @@ assert.equal(injectedGradient.ok, false);
 
 const adminUi = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
 const menuUi = await readFile(new URL('../src/client/MenuApp.tsx', import.meta.url), 'utf8');
+assert.match(adminUi, /Connected Subreddits/);
+assert.match(adminUi, /Connect Subreddit/);
+assert.match(adminUi, /Copy Config/);
+assert.match(adminUi, /Paste Config/);
+assert.match(adminUi, /Replace Config/);
+assert.match(adminUi, />Editing/);
+assert.match(adminUi, /Save & Apply to r\//);
 assert.match(adminUi, /Open admin editor/);
 assert.match(adminUi, /requestExpandedMode\(event\.nativeEvent, 'admin'\)/);
 assert.match(adminUi, /Admin access required/);

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createServer, getServerPort, reddit, context, redis, media } from '@devvit/web/server';
 import { inflateSync, deflateSync } from 'node:zlib';
-import { APP_CONFIG, getDefaultAdminConfig, isAdminPanelPostData, normalizeAdminConfig, normalizeManagedSubredditName, normalizeSubredditName, resolveRuntimeAdminPostId, type AdminConfig, type AppConfig } from '../shared/subreddit';
+import { APP_CONFIG, getDefaultAdminConfig, isAdminPanelPostData, normalizeAdminConfig, normalizeManagedSubredditName, normalizeSubredditName, readOwnSubredditConfigPayload, resolveRuntimeAdminPostId, type AdminConfig, type AppConfig } from '../shared/subreddit';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 
 const app = new Hono();
@@ -23,14 +23,8 @@ const encodeConfig = (config: AdminConfig): string =>
 const decodeConfig = (value: string): AdminConfig =>
   JSON.parse(inflateSync(Buffer.from(value, 'base64')).toString('utf8')) as AdminConfig;
 
-const getAdminConfigFromPost = async (postId?: string): Promise<{ config?: AdminConfig; warnings: string[] }> => {
-  const redditPostId = toRedditPostId(postId);
-  if (!redditPostId) return { warnings: [] };
-  const data = await reddit.getPostData(redditPostId);
-  // A link to an arbitrary post must never be treated as an admin configuration.
-  if (!isAdminPanelPostData(data)) return { warnings: [] };
-  const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
-  if (!encoded) return { config: getDefaultAdminConfig(), warnings: [] };
+const readNormalizedConfig = (encoded?: string): { config?: AdminConfig; warnings: string[] } => {
+  if (!encoded) return { warnings: [] };
   try {
     const normalized = normalizeAdminConfig(decodeConfig(encoded), 'coerce');
     if (!normalized.ok) {
@@ -40,6 +34,17 @@ const getAdminConfigFromPost = async (postId?: string): Promise<{ config?: Admin
   } catch {
     return { config: getDefaultAdminConfig(), warnings: ['Stored configuration could not be read. Saving will replace it.'] };
   }
+};
+
+const getAdminConfigFromPost = async (postId?: string): Promise<{ config?: AdminConfig; warnings: string[] }> => {
+  const redditPostId = toRedditPostId(postId);
+  if (!redditPostId) return { warnings: [] };
+  const data = await reddit.getPostData(redditPostId);
+  // A link to an arbitrary post must never be treated as an admin configuration.
+  if (!isAdminPanelPostData(data)) return { warnings: [] };
+  const encoded = typeof data?.portalConfig === 'string' ? data.portalConfig : undefined;
+  if (!encoded) return { config: getDefaultAdminConfig(), warnings: [] };
+  return readNormalizedConfig(encoded);
 };
 
 const getTargetPosts = async (): Promise<TargetPostRecord[]> => {
@@ -217,8 +222,168 @@ const requireAdminPanelAccess = async (): Promise<boolean> => {
   return (await getDelegatedAdminUsernames(subredditName)).includes(username);
 };
 
+const POST_DATA_LIMIT = 2000;
+
+const independentConfig = (config: AdminConfig): AdminConfig => ({
+  ...config,
+  managedSubreddits: [],
+});
+
+const buildAdminPostData = (config: AdminConfig) => {
+  const postData = { portalAdmin: true, portalConfig: encodeConfig(config), updatedAt: Date.now() };
+  return JSON.stringify(postData).length > POST_DATA_LIMIT ? undefined : postData;
+};
+
+const buildTargetPostData = (adminPostId: RedditPostId, config: AdminConfig) => {
+  const postData = {
+    portalSubredditConfig: true,
+    portalAdminPostId: adminPostId,
+    portalConfig: encodeConfig(independentConfig(config)),
+    updatedAt: Date.now(),
+  };
+  return JSON.stringify(postData).length > POST_DATA_LIMIT ? undefined : postData;
+};
+
+const topModeratorError = (subredditName: string) =>
+  `Could not confirm that you are the live top moderator of r/${subredditName}. No changes were made.`;
+
+type CommunityRole = 'home' | 'connected';
+
+type CommunityRecord = {
+  subredditName: string;
+  role: CommunityRole;
+  canEdit: boolean;
+  canRead: boolean;
+  followsHome: boolean;
+  postId?: string;
+  config?: AdminConfig;
+  warnings?: string[];
+};
+
+const loadCanonicalAdminPost = async () => {
+  const adminPostId = toRedditPostId(context.postId);
+  const homeName = normalizeManagedSubredditName(context.subredditName);
+  if (!adminPostId || !homeName) return { error: 'Invalid Reddit post ID.', status: 400 as const };
+  const adminPost = await reddit.getPostById(adminPostId);
+  if (normalizeSubredditName(adminPost.subredditName) !== normalizeSubredditName(homeName)) {
+    return { error: 'Admin panel does not belong to this subreddit.', status: 403 as const };
+  }
+  const storedAdminData = await reddit.getPostData(adminPostId);
+  if (!isAdminPanelPostData(storedAdminData)) {
+    return { error: 'This post is not a valid admin panel.', status: 403 as const };
+  }
+  return { adminPostId, adminPost, homeName };
+};
+
+/**
+ * Copy the current home configuration onto legacy navigation posts that still
+ * follow this panel. Only the live top moderator of a target can write it.
+ * Posts that already store their own configuration are left unchanged.
+ */
+const snapshotLegacyTargets = async (sourceConfig: AdminConfig, adminPostId: RedditPostId): Promise<Set<string>> => {
+  const written = new Set<string>();
+  const connected = new Set(sourceConfig.managedSubreddits.map((name) => name.toLowerCase()));
+  const targets = await getTargetPosts();
+  for (const target of targets) {
+    if (!connected.has(target.subredditName.toLowerCase())) continue;
+    try {
+      if (!(await isCurrentUserSubredditOwner(target.subredditName))) continue;
+      const post = await reddit.getPostById(target.postId);
+      if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(target.subredditName)) continue;
+      const stored = await reddit.getPostData(target.postId);
+      if (isAdminPanelPostData(stored) || readOwnSubredditConfigPayload(stored)) continue;
+      const postData = buildTargetPostData(adminPostId, sourceConfig);
+      if (!postData) {
+        console.warn('Skipping configuration snapshot; it is too large for r/' + target.subredditName);
+        continue;
+      }
+      await post.setPostData(postData);
+      written.add(target.subredditName.toLowerCase());
+    } catch (error) {
+      console.warn('Could not snapshot navigation config for r/' + target.subredditName, error);
+    }
+  }
+  return written;
+};
+
+const collectCommunities = async (
+  homeConfig: AdminConfig,
+  homeName: string,
+  isHomeOwner: boolean,
+  adminPostId: RedditPostId,
+): Promise<CommunityRecord[]> => {
+  const snapshotted = await snapshotLegacyTargets(homeConfig, adminPostId);
+  const targets = await getTargetPosts();
+  const bySub = new Map(targets.map((item) => [item.subredditName, item]));
+  const names = [homeName, ...homeConfig.managedSubreddits.filter((name) => name !== homeName)];
+  const communities: CommunityRecord[] = [];
+
+  for (const name of names) {
+    if (name === homeName) {
+      communities.push({
+        subredditName: name,
+        role: 'home',
+        canEdit: true,
+        canRead: true,
+        followsHome: false,
+        postId: adminPostId,
+        config: homeConfig,
+        warnings: [],
+      });
+      continue;
+    }
+
+    const canEdit = await isCurrentUserSubredditOwner(name);
+    const canRead = isHomeOwner || canEdit;
+    const record = bySub.get(name);
+    let followsHome = true;
+    let config = homeConfig;
+    let warnings: string[] = [];
+    if (snapshotted.has(name)) {
+      followsHome = false;
+      config = independentConfig(homeConfig);
+    } else if (record) {
+      try {
+        const data = await reddit.getPostData(record.postId);
+        const own = readOwnSubredditConfigPayload(data);
+        if (own) {
+          followsHome = false;
+          const loaded = readNormalizedConfig(own);
+          config = loaded.config ?? independentConfig(homeConfig);
+          warnings = loaded.warnings;
+        }
+      } catch (error) {
+        console.warn('Could not read connected navigation post', record.postId, error);
+      }
+    }
+
+    communities.push({
+      subredditName: name,
+      role: 'connected',
+      canEdit,
+      canRead,
+      followsHome,
+      postId: record?.postId,
+      ...(canRead ? { config, warnings } : {}),
+    });
+  }
+
+  return communities;
+};
+
 app.get('/api/runtime-config', async (c) => {
   try {
+    const ownPayload = readOwnSubredditConfigPayload(context.postData);
+    if (ownPayload) {
+      try {
+        const normalized = normalizeAdminConfig(decodeConfig(ownPayload), 'coerce');
+        if (normalized.ok) {
+          return c.json({ config: effectiveConfig(normalized.config), adminPostId: null });
+        }
+      } catch (error) {
+        console.warn('Stored subreddit configuration could not be read; following the admin panel.', error);
+      }
+    }
     const adminPostId = resolveRuntimeAdminPostId({
       currentPostId: context.postId,
       postData: context.postData,
@@ -241,13 +406,19 @@ app.get('/api/admin/config', async (c) => {
     const config = loaded.config ?? getDefaultAdminConfig();
     const subredditName = normalizeManagedSubredditName(context.subredditName)!;
     const isOwner = await isCurrentUserSubredditOwner(subredditName);
+    const adminPostId = toRedditPostId(context.postId)!;
+    const communities = (await collectCommunities(config, subredditName, isOwner, adminPostId))
+      .map((community) => community.role === 'home' ? { ...community, warnings: loaded.warnings } : community);
+    const homeCommunity = communities.find((community) => community.role === 'home');
     return c.json({
-      config,
+      config: homeCommunity?.config ?? config,
       warnings: loaded.warnings,
       targets: await getTargetPosts(),
       adminPostId: context.postId,
       accessLevel: isOwner ? 'topModerator' : 'delegatedModerator',
       canManageAccess: isOwner,
+      homeSubreddit: subredditName,
+      communities,
     });
   } catch (error) {
     console.error('Failed to load admin config', error);
@@ -347,104 +518,267 @@ app.get('/api/moderator-status', async (c) => {
   }
 });
 
+const writeConnectedConfig = async (
+  subredditName: string,
+  config: AdminConfig,
+  adminPostId: RedditPostId,
+): Promise<{ error: string; status: 400 | 403 | 404 | 409 } | { ok: true }> => {
+  if (!(await isCurrentUserSubredditOwner(subredditName))) {
+    return { error: topModeratorError(subredditName), status: 403 };
+  }
+  const targets = await getTargetPosts();
+  const current = targets.find((item) => item.subredditName === subredditName);
+  if (!current) {
+    return { error: `r/${subredditName} has no navigation post yet. Choose Connect Subreddit first.`, status: 404 };
+  }
+  const post = await reddit.getPostById(current.postId);
+  if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
+    return { error: 'Stored post belongs to a different subreddit. No changes were made.', status: 409 };
+  }
+  const stored = await reddit.getPostData(current.postId);
+  if (isAdminPanelPostData(stored)) {
+    return { error: 'Stored post is an admin panel. No changes were made.', status: 409 };
+  }
+  const postData = buildTargetPostData(adminPostId, config);
+  if (!postData) {
+    return { error: 'Configuration is too large for Reddit post data. Remove unused assets or buttons.', status: 400 };
+  }
+  await post.setPostData(postData);
+  return { ok: true };
+};
+
 app.post('/api/admin/save', async (c) => {
   try {
     if (!(await requireAdminPanelAccess())) {
       return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
-    const payload = await c.req.json<{ config: AdminConfig }>();
+    const payload = await c.req.json<{ subredditName?: string; config: AdminConfig }>();
     const normalized = normalizeAdminConfig(payload?.config, 'strict');
     if (!normalized.ok) return c.json({ error: normalized.error }, 400);
 
-    const config = normalized.config;
-    const encoded = encodeConfig(config);
-    if (JSON.stringify({ portalAdmin: true, portalConfig: encoded }).length > 2000) {
-      return c.json({ error: 'Configuration is too large for Reddit post data. Remove unused assets or buttons.' }, 400);
-    }
+    const loadedPanel = await loadCanonicalAdminPost();
+    if ('error' in loadedPanel) return c.json({ error: loadedPanel.error }, loadedPanel.status);
+    const { adminPostId, adminPost, homeName } = loadedPanel;
+    const requested = normalizeManagedSubredditName(payload?.subredditName) ?? homeName;
+    const stored = (await getAdminConfigFromPost(adminPostId)).config ?? getDefaultAdminConfig();
 
-    const adminPostId = toRedditPostId(context.postId);
-    if (!adminPostId) return c.json({ error: 'Invalid Reddit post ID.' }, 400);
-    const adminPost = await reddit.getPostById(adminPostId);
-    if (
-      normalizeSubredditName(adminPost.subredditName) !==
-      normalizeSubredditName(context.subredditName)
-    ) {
-      return c.json({ error: 'Admin panel does not belong to this subreddit.' }, 403);
-    }
-    const storedAdminData = await reddit.getPostData(adminPostId);
-    if (!isAdminPanelPostData(storedAdminData)) {
-      return c.json({ error: 'This post is not a valid admin panel.' }, 403);
-    }
-    await adminPost.setPostData({ portalAdmin: true, portalConfig: encoded, updatedAt: Date.now() });
-
-    const existing = await getTargetPosts();
-    const bySub = new Map(existing.map((item) => [item.subredditName.toLowerCase(), item]));
-    const results: Array<{ subredditName: string; status: string; postId?: string; error?: string }> = [];
-
-    for (const subredditName of config.managedSubreddits) {
-      try {
-        if (!(await isCurrentUserModerator(subredditName))) {
-          results.push({ subredditName, status: 'not-moderator', error: 'You are not a moderator there.' });
-          continue;
-        }
-        const current = bySub.get(subredditName.toLowerCase());
-        if (current) {
-          try {
-            const post = await reddit.getPostById(current.postId);
-            if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
-              results.push({
-                subredditName,
-                status: 'error',
-                error: 'Stored post belongs to a different subreddit. No changes were made.',
-              });
-              continue;
-            }
-            const storedTargetData = await reddit.getPostData(current.postId);
-            if (!toRedditPostId(storedTargetData?.portalAdminPostId)) {
-              results.push({
-                subredditName,
-                status: 'error',
-                error: 'Stored post is not linked to an admin panel. No changes were made.',
-              });
-              continue;
-            }
-            await post.setPostData({ portalAdminPostId: adminPostId });
-            results.push({ subredditName, status: 'updated', postId: current.postId });
-          } catch (error) {
-            console.warn('Managed navigation post is stale; recreating it.', current.postId, error);
-            const post = await reddit.submitCustomPost({
-              subredditName,
-              title: '\u200B',
-              entry: 'default',
-              postData: { portalAdminPostId: adminPostId },
-            });
-            bySub.set(subredditName.toLowerCase(), { subredditName, postId: post.id });
-            results.push({ subredditName, status: 'created', postId: post.id });
-          }
-        } else {
-          const post = await reddit.submitCustomPost({
-            subredditName,
-            title: '\u200B',
-            entry: 'default',
-            postData: { portalAdminPostId: adminPostId },
-          });
-          bySub.set(subredditName.toLowerCase(), { subredditName, postId: post.id });
-          results.push({ subredditName, status: 'created', postId: post.id });
-        }
-      } catch (error) {
-        console.error('Failed to sync subreddit', subredditName, error);
-        results.push({ subredditName, status: 'error', error: 'App installation or permission is missing.' });
+    if (requested === homeName) {
+      await snapshotLegacyTargets(stored, adminPostId);
+      const next = { ...normalized.config, managedSubreddits: stored.managedSubreddits };
+      const postData = buildAdminPostData(next);
+      if (!postData) {
+        return c.json({ error: 'Configuration is too large for Reddit post data. Remove unused assets or buttons.' }, 400);
       }
+      await adminPost.setPostData(postData);
+      return c.json({ ok: true, subredditName: homeName, config: next });
     }
 
-    // Keep records for communities that were unselected so adding them again
-    // updates the existing navigation post instead of creating a duplicate.
-    const nextTargets = [...bySub.values()];
-    await saveTargetPosts(nextTargets);
-    return c.json({ ok: true, config, targets: nextTargets, results });
+    if (!stored.managedSubreddits.includes(requested)) {
+      return c.json({ error: `r/${requested} is not connected to this panel.` }, 400);
+    }
+    if (!(await isCurrentUserSubredditOwner(requested))) {
+      return c.json({ error: topModeratorError(requested) }, 403);
+    }
+    const written = await writeConnectedConfig(requested, normalized.config, adminPostId);
+    if ('error' in written) return c.json({ error: written.error }, written.status);
+    return c.json({ ok: true, subredditName: requested, config: independentConfig(normalized.config) });
   } catch (error) {
     console.error('Failed to save admin config', error);
     return c.json({ error: 'Failed to save and apply the configuration.' }, 500);
+  }
+});
+
+app.post('/api/admin/connect', async (c) => {
+  try {
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+    }
+    const payload = await c.req.json<{ subredditName?: string }>();
+    const subredditName = normalizeManagedSubredditName(payload?.subredditName);
+    const loadedPanel = await loadCanonicalAdminPost();
+    if ('error' in loadedPanel) return c.json({ error: loadedPanel.error }, loadedPanel.status);
+    const { adminPostId, adminPost, homeName } = loadedPanel;
+    if (!subredditName) {
+      return c.json({ error: 'Enter a subreddit name with 2–21 letters, numbers, or underscores.' }, 400);
+    }
+    if (subredditName === homeName) {
+      return c.json({ error: 'This community is already in the editor. Choose it under Editing.' }, 400);
+    }
+    if (!(await isCurrentUserSubredditOwner(subredditName))) {
+      return c.json({ error: topModeratorError(subredditName) }, 403);
+    }
+
+    const stored = (await getAdminConfigFromPost(adminPostId)).config ?? getDefaultAdminConfig();
+    const postData = buildTargetPostData(adminPostId, stored);
+    if (!postData) {
+      return c.json({ error: 'The saved configuration is too large to copy onto another subreddit. Remove unused assets or buttons, save this community, and try again.' }, 400);
+    }
+
+    const existing = await getTargetPosts();
+    const bySub = new Map(existing.map((item) => [item.subredditName, item]));
+    let record = bySub.get(subredditName);
+    if (record) {
+      try {
+        const post = await reddit.getPostById(record.postId);
+        if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
+          return c.json({ error: 'Stored post belongs to a different subreddit. No changes were made.' }, 409);
+        }
+        const storedTarget = await reddit.getPostData(record.postId);
+        if (isAdminPanelPostData(storedTarget)) {
+          return c.json({ error: 'Stored post is an admin panel. No changes were made.' }, 409);
+        }
+        if (!readOwnSubredditConfigPayload(storedTarget)) {
+          await post.setPostData(postData);
+        }
+      } catch (error) {
+        console.warn('Connected navigation post is missing; creating a new one.', record.postId, error);
+        record = undefined;
+      }
+    }
+
+    if (!record) {
+      try {
+        const post = await reddit.submitCustomPost({
+          subredditName,
+          title: '\u200B',
+          entry: 'default',
+          postData,
+        });
+        record = { subredditName, postId: post.id };
+        bySub.set(subredditName, record);
+      } catch (error) {
+        console.error('Failed to create connected navigation post', subredditName, error);
+        return c.json({
+          error: `The app must be installed in r/${subredditName}, and you must be its live top moderator. No navigation post was created.`,
+        }, 403);
+      }
+    }
+
+    await saveTargetPosts([...bySub.values()]);
+    if (!stored.managedSubreddits.includes(subredditName)) {
+      const next = { ...stored, managedSubreddits: [...stored.managedSubreddits, subredditName] };
+      const adminData = buildAdminPostData(next);
+      if (!adminData) {
+        return c.json({ error: 'This panel cannot store another connected subreddit until unused assets or buttons are removed.' }, 400);
+      }
+      await adminPost.setPostData(adminData);
+    }
+    return c.json({ ok: true, subredditName });
+  } catch (error) {
+    console.error('Failed to connect subreddit', error);
+    return c.json({ error: 'Failed to connect that subreddit. No changes were made.' }, 500);
+  }
+});
+
+app.post('/api/admin/disconnect', async (c) => {
+  try {
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+    }
+    const payload = await c.req.json<{ subredditName?: string }>();
+    const subredditName = normalizeManagedSubredditName(payload?.subredditName);
+    const loadedPanel = await loadCanonicalAdminPost();
+    if ('error' in loadedPanel) return c.json({ error: loadedPanel.error }, loadedPanel.status);
+    const { adminPostId, adminPost, homeName } = loadedPanel;
+    if (!subredditName || subredditName === homeName) {
+      return c.json({ error: 'Choose a connected subreddit other than this community.' }, 400);
+    }
+    const stored = (await getAdminConfigFromPost(adminPostId)).config ?? getDefaultAdminConfig();
+    if (!stored.managedSubreddits.includes(subredditName)) {
+      return c.json({ error: `r/${subredditName} is not connected to this panel.` }, 400);
+    }
+
+    const record = (await getTargetPosts()).find((item) => item.subredditName === subredditName);
+    if (record) {
+      try {
+        const post = await reddit.getPostById(record.postId);
+        if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) {
+          return c.json({ error: 'Stored post belongs to a different subreddit. No changes were made.' }, 409);
+        }
+        const storedTarget = await reddit.getPostData(record.postId);
+        if (!isAdminPanelPostData(storedTarget) && !readOwnSubredditConfigPayload(storedTarget)) {
+          if (!(await isCurrentUserSubredditOwner(subredditName))) {
+            return c.json({
+              error: `Could not confirm that you are the live top moderator of r/${subredditName}. Disconnect was refused so r/${subredditName} keeps its current navigation.`,
+            }, 403);
+          }
+          const postData = buildTargetPostData(adminPostId, stored);
+          if (!postData) {
+            return c.json({ error: 'The current configuration is too large to keep on that navigation post. No changes were made.' }, 400);
+          }
+          await post.setPostData(postData);
+        }
+      } catch (error) {
+        console.error('Could not verify navigation post before disconnect', record.postId, error);
+        return c.json({ error: `Could not verify the navigation post for r/${subredditName}. No changes were made.` }, 502);
+      }
+    }
+
+    const next = { ...stored, managedSubreddits: stored.managedSubreddits.filter((name) => name !== subredditName) };
+    const adminData = buildAdminPostData(next);
+    if (!adminData) {
+      return c.json({ error: 'Could not update the connected subreddit list. No changes were made.' }, 400);
+    }
+    await adminPost.setPostData(adminData);
+    return c.json({ ok: true, subredditName });
+  } catch (error) {
+    console.error('Failed to disconnect subreddit', error);
+    return c.json({ error: 'Failed to disconnect that subreddit. No changes were made.' }, 500);
+  }
+});
+
+app.post('/api/admin/paste', async (c) => {
+  try {
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
+    }
+    const payload = await c.req.json<{ sourceSubreddit?: string; targetSubreddit?: string; config: AdminConfig }>();
+    const normalized = normalizeAdminConfig(payload?.config, 'strict');
+    if (!normalized.ok) return c.json({ error: normalized.error }, 400);
+
+    const sourceSubreddit = normalizeManagedSubredditName(payload?.sourceSubreddit);
+    const targetSubreddit = normalizeManagedSubredditName(payload?.targetSubreddit);
+    const loadedPanel = await loadCanonicalAdminPost();
+    if ('error' in loadedPanel) return c.json({ error: loadedPanel.error }, loadedPanel.status);
+    const { adminPostId, adminPost, homeName } = loadedPanel;
+    if (!sourceSubreddit || !targetSubreddit || sourceSubreddit === targetSubreddit) {
+      return c.json({ error: 'Copy a configuration, select a different subreddit, then paste it.' }, 400);
+    }
+
+    const stored = (await getAdminConfigFromPost(adminPostId)).config ?? getDefaultAdminConfig();
+    const known = new Set([homeName, ...stored.managedSubreddits]);
+    if (!known.has(sourceSubreddit) || !known.has(targetSubreddit)) {
+      return c.json({ error: 'Copy and paste only work between this community and connected subreddits.' }, 400);
+    }
+    const isHomeOwner = await isCurrentUserSubredditOwner(homeName);
+    const sourceReadable = sourceSubreddit === homeName
+      || isHomeOwner
+      || await isCurrentUserSubredditOwner(sourceSubreddit);
+    if (!sourceReadable) {
+      return c.json({ error: `You cannot copy the configuration for r/${sourceSubreddit}.` }, 403);
+    }
+    const targetEditable = targetSubreddit === homeName || await isCurrentUserSubredditOwner(targetSubreddit);
+    if (!targetEditable) {
+      return c.json({ error: topModeratorError(targetSubreddit) }, 403);
+    }
+
+    if (targetSubreddit === homeName) {
+      await snapshotLegacyTargets(stored, adminPostId);
+      const next = { ...normalized.config, managedSubreddits: stored.managedSubreddits };
+      const postData = buildAdminPostData(next);
+      if (!postData) {
+        return c.json({ error: 'Configuration is too large for Reddit post data. Remove unused assets or buttons.' }, 400);
+      }
+      await adminPost.setPostData(postData);
+      return c.json({ ok: true, subredditName: homeName, config: next });
+    }
+
+    const written = await writeConnectedConfig(targetSubreddit, normalized.config, adminPostId);
+    if ('error' in written) return c.json({ error: written.error }, written.status);
+    return c.json({ ok: true, subredditName: targetSubreddit, config: independentConfig(normalized.config) });
+  } catch (error) {
+    console.error('Failed to paste subreddit configuration', error);
+    return c.json({ error: 'Failed to paste that configuration. No changes were made.' }, 500);
   }
 });
 
@@ -701,8 +1035,8 @@ const retargetManagedPosts = async (adminPostId: RedditPostId) => {
   const targets = await getTargetPosts();
   for (const target of targets) {
     try {
-      if (!(await isCurrentUserModerator(target.subredditName))) {
-        console.warn('Skipping managed-post retarget; actor is not a moderator of r/' + target.subredditName);
+      if (!(await isCurrentUserSubredditOwner(target.subredditName))) {
+        console.warn('Skipping managed-post retarget; actor is not the live top moderator of r/' + target.subredditName);
         continue;
       }
       const post = await reddit.getPostById(target.postId);
@@ -715,7 +1049,22 @@ const retargetManagedPosts = async (adminPostId: RedditPostId) => {
         console.warn('Skipping managed-post retarget; stored post is an admin panel.', target.postId);
         continue;
       }
-      await post.setPostData({ portalAdminPostId: adminPostId });
+      const own = readOwnSubredditConfigPayload(stored);
+      if (!own) {
+        console.warn('Skipping managed-post retarget; r/' + target.subredditName + ' still follows the previous panel.');
+        continue;
+      }
+      const postData = {
+        portalSubredditConfig: true,
+        portalAdminPostId: adminPostId,
+        portalConfig: own,
+        updatedAt: typeof stored?.updatedAt === 'number' ? stored.updatedAt : Date.now(),
+      };
+      if (JSON.stringify(postData).length > POST_DATA_LIMIT) {
+        console.warn('Skipping managed-post retarget; preserving the existing configuration for r/' + target.subredditName);
+        continue;
+      }
+      await post.setPostData(postData);
     } catch (error) {
       console.warn('Could not retarget managed navigation post', target.postId, error);
     }
@@ -729,10 +1078,18 @@ app.post('/internal/menu/create-admin', async (c) => {
     if (!subredditName || !(await isCurrentUserSubredditOwner(subredditName))) {
       return c.json<UiResponse>({ showToast: 'Only this subreddit’s top moderator can create the admin panel.' });
     }
+    const existing = await redis.get(ADMIN_POST_KEY);
+    if (existing) {
+      try {
+        const previous = await getAdminConfigFromPost(existing);
+        if (previous.config) await snapshotLegacyTargets(previous.config, existing as RedditPostId);
+      } catch (error) {
+        console.warn('Could not snapshot connected navigation posts before replacing the panel.', error);
+      }
+    }
     // A replacement panel starts blank. Clear grants before the new post exists
     // so a failed recreate cannot leave the previous delegates authorized.
     await redis.del(getDelegatedAdminsKey(subredditName));
-    const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
       try {
         const oldAdminPost = await reddit.getPostById(existing as RedditPostId);

@@ -24,7 +24,7 @@ The **Community Navigation Admin** panel is a separate custom post. It opens in 
 - Petal or custom backgrounds.
 - Subreddit buttons: label, destination, accent, label color, font, size, weight, gradient, icon, background, and background position/scale. A button can be disabled without deleting it.
 - An asset library of Reddit-hosted images and GIFs. Deleting an asset clears references to it.
-- Managed subreddits. Save creates or updates this app’s navigation post in each selected community.
+- Several subreddits from one admin post. Each connected subreddit has its own buttons, welcome media, backgrounds, and label styles. This community keeps its own configuration too.
 
 Destination checks run in the editor and again on the server. Only HTTPS URLs on `reddit.com`, `www.reddit.com`, or `old.reddit.com` with a direct `/r/SubredditName/` path are accepted. Posts, profiles, other websites, query strings, fragments, and custom ports are rejected. Saved links are rewritten to `https://www.reddit.com/r/{name}/`.
 
@@ -40,20 +40,22 @@ Reddit does not expose a separate subreddit-owner role. This app treats the **fi
 | --- | --- |
 | Create or replace the admin panel | Top moderator of the current subreddit |
 | Grant or revoke dashboard access | Top moderator, from the canonical admin panel |
-| Edit the dashboard, assets, and managed posts | Top moderator, or a current moderator with an explicit grant |
+| Edit and publish this community’s configuration | Top moderator, or a current moderator with an explicit grant |
 | Create a navigation post in this subreddit | Any current moderator |
-| Create or update a navigation post in another subreddit | A dashboard editor who is also a moderator there, with the app installed there |
+| Connect, edit, paste, or publish another subreddit | Someone who can open this panel and is the live top moderator of that subreddit, with the app installed there |
 
 Grants are stored for this installation only and are tied to the top moderator who issued them.
 
-- A delegated moderator can edit the dashboard. They cannot grant access, revoke access, or replace the panel.
+- A delegated moderator can edit, copy, and paste this community’s configuration. They cannot grant access, revoke access, or replace the panel.
+- A delegated moderator can connect, view, edit, or paste another subreddit only when they are that subreddit’s live top moderator. Otherwise that configuration stays hidden. The check fails closed when Reddit cannot confirm the live moderator list.
+- The top moderator of this community can view every connected configuration, which lets them copy it. They can connect, paste, or publish a subreddit only when they are also that subreddit’s live top moderator.
 - Every admin request checks the delegate’s current moderator permissions. Removal from the moderator team denies access immediately, even before the stored grant is cleaned up.
 - **Scan Mod Team** reloads the live roster and deletes grants for accounts that are no longer moderators. The top moderator is shown as the owner and cannot be stored as a delegate.
 - If the top moderator changes, previous grants stop working. The new top moderator must grant access again.
-- **Create Navigation Admin Panel** removes the previous panel, creates a blank one, and clears delegated access. It does not copy the previous buttons, media, or grants. Use it to replace a panel, not to refresh one.
-- A managed navigation post follows the source panel’s saved public configuration. Moderators of the target community do not gain edit access to the source panel.
-- Removing a managed subreddit stops future updates but remembers the existing post. Adding that subreddit again updates the same post instead of creating a duplicate.
-- Replacing the admin panel points remembered navigation posts at the new panel when the acting top moderator also moderates those communities. Otherwise those posts keep their previous link until someone with both permissions saves again.
+- **Create Navigation Admin Panel** removes the previous panel, creates a blank one, and clears delegated access. It does not copy the previous buttons, media, or grants. Before the old panel is removed, connected navigation posts are given their own copy when the acting user is the live top moderator of that subreddit. Use it to replace a panel, not to refresh one.
+- **Disconnect** removes a subreddit from this panel and keeps its navigation post. If that post still follows this community, disconnect is refused unless the acting user is the live top moderator there, so the post is not left on a shared link. Connecting the same name again reuses the remembered post.
+
+Devvit cannot list the subreddits a user moderates or where this app is installed. The **Connected Subreddits** section therefore asks for a typed name. The server accepts it only when both checks pass: this app is installed in that subreddit, and the acting user is first in its live moderator list.
 
 Each subreddit installation has its own Redis data, canonical admin post, and grant list. An admin panel in one community cannot edit another community’s panel.
 
@@ -97,9 +99,13 @@ GitHub Actions runs the isolation tests, TypeScript check, and production build 
 4. In **Moderator Access**, choose **Scan Mod Team**, then **Grant Access** beside a current moderator. **Revoke Access** removes that grant.
 5. Add SFW welcome media if you want an intro.
 6. Add subreddit buttons with direct Reddit subreddit URLs.
-7. Add managed subreddit names. You must moderate each one, and the app must be installed there.
-8. Choose **Save & Apply**.
-9. Use **Create Navigation Post** when you want another navigation post in the current subreddit for review.
+7. Under **Connected Subreddits**, use **Editing** to choose `r/{this community} (this community)` or another connected subreddit. Each one has its own configuration.
+8. To connect another subreddit, type its name (for example in **Subreddit name, e.g. YourSubreddit**) and choose **Connect Subreddit**. You must be the live top moderator there, and the app must already be installed there. The new navigation post starts from this community’s saved configuration, so save unsaved work first.
+9. Choose **Copy Config** on the community you want to copy. Select the other community under **Editing**, choose **Paste Config**, then **Replace Config**. Cancel leaves the target unchanged. Pasted configurations are checked again on the server.
+10. Choose **Save & Apply to r/{name}** to publish only the community selected under **Editing**.
+11. Use **Create Navigation Post** when you want another navigation post in the current subreddit for review. That local post keeps following this community’s configuration.
+
+A navigation post created before this per-subreddit storage keeps showing the configuration it shows today. The first time someone who can open this panel, and who is that subreddit’s live top moderator, loads the dashboard, that configuration is stored on the navigation post itself. Later edits to this community do not change it. If that person cannot be confirmed, the post stays linked to this community. Saving this community can still change a post that has not been given its own copy.
 
 Confirm an ungranted moderator is denied, a removed moderator loses access immediately, a new top moderator must grant access again, and external or non-subreddit URLs are rejected. Check the expanded post on web and mobile, and confirm every destination and image complies with Reddit’s current rules.
 

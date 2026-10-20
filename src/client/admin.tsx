@@ -21,6 +21,30 @@ import { useWebViewMode } from './useWebViewMode';
 
 type TargetRecord = { subredditName: string; postId: string };
 type AccessLevel = 'topModerator' | 'delegatedModerator';
+type CommunityRole = 'home' | 'connected';
+
+type CommunityRecord = {
+  subredditName: string;
+  role: CommunityRole;
+  canEdit: boolean;
+  canRead: boolean;
+  followsHome: boolean;
+  postId?: string;
+  config?: AdminConfig;
+  warnings?: string[];
+};
+
+type AdminPayload = {
+  config: AdminConfig;
+  warnings?: string[];
+  targets: TargetRecord[];
+  accessLevel?: AccessLevel;
+  canManageAccess?: boolean;
+  homeSubreddit?: string;
+  communities?: CommunityRecord[];
+};
+
+type CopiedConfig = { source: string; config: AdminConfig };
 
 class ApiError extends Error {
   status: number;
@@ -114,13 +138,20 @@ const BackgroundEditor = ({ button, onChange }: { button: ManagedButton; onChang
 
 export const AdminApp = () => {
   const mode = useWebViewMode();
+  const drafts = useRef<Record<string, AdminConfig>>({});
   const [config, setConfig] = useState<AdminConfig>(cloneDefault());
   const [targets, setTargets] = useState<TargetRecord[]>([]);
+  const [communities, setCommunities] = useState<CommunityRecord[]>([]);
+  const [homeSubreddit, setHomeSubreddit] = useState('');
+  const [selected, setSelected] = useState('');
+  const [copied, setCopied] = useState<CopiedConfig | null>(null);
+  const [pasteConfirm, setPasteConfirm] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [newSubreddit, setNewSubreddit] = useState('');
   const [accessLevel, setAccessLevel] = useState<AccessLevel>('delegatedModerator');
   const [moderators, setModerators] = useState<string[]>([]);
@@ -143,23 +174,45 @@ export const AdminApp = () => {
     }
   };
 
+  const applyLoaded = (data: AdminPayload, prefer?: string, keepDrafts = false) => {
+    if (!keepDrafts) drafts.current = {};
+    const nextCommunities = data.communities?.length
+      ? data.communities
+      : [{
+          subredditName: data.homeSubreddit || 'community',
+          role: 'home' as const,
+          canEdit: true,
+          canRead: true,
+          followsHome: false,
+          config: data.config,
+          warnings: data.warnings ?? [],
+        }];
+    const home = data.homeSubreddit || nextCommunities.find((item) => item.role === 'home')?.subredditName || '';
+    const nextName = prefer && nextCommunities.some((item) => item.subredditName === prefer) ? prefer : home;
+    const community = nextCommunities.find((item) => item.subredditName === nextName);
+    setCommunities(nextCommunities);
+    setHomeSubreddit(home);
+    setTargets(data.targets ?? []);
+    setAccessLevel(data.accessLevel ?? 'delegatedModerator');
+    setSelected(nextName);
+    const draft = keepDrafts ? drafts.current[nextName] : undefined;
+    if (community?.canRead) {
+      setConfig(draft ?? community.config ?? cloneDefault());
+      setWarnings(draft ? [] : (community.warnings ?? data.warnings ?? []));
+    } else {
+      setConfig(cloneDefault());
+      setWarnings([]);
+    }
+    setReady(true);
+  };
+
   const loadConfig = async () => {
     setReady(false);
     setLoadError(null);
     setAccessDenied(null);
     try {
-      const data = await api<{
-        config: AdminConfig;
-        warnings?: string[];
-        targets: TargetRecord[];
-        accessLevel?: AccessLevel;
-        canManageAccess?: boolean;
-      }>('/api/admin/config');
-      setConfig(data.config);
-      setWarnings(data.warnings ?? []);
-      setTargets(data.targets ?? []);
-      setAccessLevel(data.accessLevel ?? 'delegatedModerator');
-      setReady(true);
+      const data = await api<AdminPayload>('/api/admin/config');
+      applyLoaded(data);
       if (data.canManageAccess) await refreshModeratorRoster();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load admin panel.';
@@ -169,6 +222,11 @@ export const AdminApp = () => {
         setLoadError(message);
       }
     }
+  };
+
+  const refreshConfig = async (prefer: string) => {
+    const data = await api<AdminPayload>('/api/admin/config');
+    applyLoaded(data, prefer, true);
   };
 
   useEffect(() => {
@@ -305,7 +363,7 @@ export const AdminApp = () => {
         updateButton(buttonId, kind === 'background' ? { background: uploaded.url } : { icon: uploaded.url });
       }
 
-      showToast('Asset uploaded successfully. Click Save & Apply to persist it.');
+      showToast(`Asset uploaded. Choose Save & Apply to r/${selected || 'this community'} to persist it.`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Asset upload failed.');
     }
@@ -336,21 +394,27 @@ export const AdminApp = () => {
         })),
       };
     });
-    showToast('Asset removed. Save & Apply to keep the change.');
+    showToast(`Asset removed. Choose Save & Apply to r/${selected || 'this community'} to keep the change.`);
   };
 
-  const addSubreddit = () => {
-    const normalized = normalizeManagedSubredditName(newSubreddit);
-    if (!normalized) {
-      showToast('Enter a subreddit name with 2–21 letters, numbers, or underscores.');
-      return;
+  const rememberDraft = () => {
+    const community = communities.find((item) => item.subredditName === selected);
+    if (community?.canRead && community.canEdit && selected) drafts.current[selected] = config;
+  };
+
+  const switchCommunity = (name: string) => {
+    if (!name || name === selected) return;
+    rememberDraft();
+    setPasteConfirm(false);
+    const community = communities.find((item) => item.subredditName === name);
+    setSelected(name);
+    if (community?.canRead) {
+      setConfig(drafts.current[name] ?? community.config ?? cloneDefault());
+      setWarnings(community.warnings ?? []);
+    } else {
+      setConfig(cloneDefault());
+      setWarnings([]);
     }
-    setConfig((current) => (
-      current.managedSubreddits.includes(normalized)
-        ? current
-        : { ...current, managedSubreddits: [...current.managedSubreddits, normalized] }
-    ));
-    setNewSubreddit('');
   };
 
   const setModeratorAccess = async (username: string, granted: boolean) => {
@@ -371,7 +435,15 @@ export const AdminApp = () => {
     }
   };
 
+  const selectedCommunity = communities.find((item) => item.subredditName === selected);
+  const canEditSelected = selectedCommunity?.canEdit === true;
+  const canReadSelected = selectedCommunity?.canRead === true;
+
   const save = async () => {
+    if (!canEditSelected) {
+      showToast(`Could not confirm that you are the live top moderator of r/${selected}. No changes were made.`);
+      return;
+    }
     const invalidButton = config.buttons.find((button) => (
       !button.label.trim() ||
       button.label.trim().length > BUTTON_LABEL_MAX ||
@@ -381,34 +453,118 @@ export const AdminApp = () => {
       showToast(`“${invalidButton.label.trim() || 'Subreddit button'}” needs a label and a valid Reddit subreddit URL, such as https://www.reddit.com/r/YourSubreddit/.`);
       return;
     }
-    if (config.managedSubreddits.some((name) => !normalizeManagedSubredditName(name))) {
-      showToast('Remove invalid managed subreddit names before saving.');
-      return;
-    }
 
     setSaving(true);
     try {
-      const data = await api<{
-        config: AdminConfig;
-        targets: TargetRecord[];
-        results: Array<{ subredditName: string; status: string; error?: string }>;
-      }>('/api/admin/save', {
+      await api('/api/admin/save', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subredditName: selected, config }),
+      });
+      delete drafts.current[selected];
+      await refreshConfig(selected);
+      showToast(`Saved r/${selected}.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const connectSubreddit = async () => {
+    const normalized = normalizeManagedSubredditName(newSubreddit);
+    if (!normalized) {
+      showToast('Enter a subreddit name with 2–21 letters, numbers, or underscores.');
+      return;
+    }
+    if (normalized === homeSubreddit) {
+      showToast('This community is already in the editor. Choose it under Editing.');
+      return;
+    }
+    setConnecting(true);
+    try {
+      await api('/api/admin/connect', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subredditName: normalized }),
+      });
+      setNewSubreddit('');
+      delete drafts.current[normalized];
+      await refreshConfig(normalized);
+      showToast(`Connected r/${normalized}. A new connection starts from this community’s saved configuration.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not connect that subreddit.');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const disconnectSubreddit = async () => {
+    if (!selected || selected === homeSubreddit) return;
+    const name = selected;
+    setConnecting(true);
+    try {
+      await api('/api/admin/disconnect', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subredditName: name }),
+      });
+      delete drafts.current[name];
+      await refreshConfig(homeSubreddit);
+      showToast(`Disconnected r/${name}. Its navigation post was kept.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not disconnect that subreddit.');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const copyConfig = () => {
+    if (!canReadSelected || !selected) {
+      showToast(`You cannot copy r/${selected || 'this subreddit'}.`);
+      return;
+    }
+    setCopied({ source: selected, config: JSON.parse(JSON.stringify(config)) as AdminConfig });
+    setPasteConfirm(false);
+    showToast(`Copied r/${selected}. Select another subreddit, then choose Paste Config.`);
+  };
+
+  const requestPaste = () => {
+    if (!copied) {
+      showToast('Copy a configuration first, then choose Paste Config.');
+      return;
+    }
+    if (copied.source === selected) {
+      showToast('Select a different subreddit before pasting.');
+      return;
+    }
+    if (!canEditSelected) {
+      showToast(`Could not confirm that you are the live top moderator of r/${selected}. No changes were made.`);
+      return;
+    }
+    setPasteConfirm(true);
+  };
+
+  const confirmPaste = async () => {
+    if (!copied || !selected || copied.source === selected) return;
+    setSaving(true);
+    try {
+      await api('/api/admin/paste', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          config: {
-            ...config,
-            managedSubreddits: config.managedSubreddits.map((name) => normalizeManagedSubredditName(name)!),
-          },
+          sourceSubreddit: copied.source,
+          targetSubreddit: selected,
+          config: copied.config,
         }),
       });
-      setConfig(data.config);
-      setTargets(data.targets ?? []);
-      setWarnings([]);
-      const failed = data.results.filter((item) => !['created', 'updated'].includes(item.status));
-      showToast(failed.length ? `Saved. ${failed.length} subreddit(s) need installation or permission.` : 'Saved and applied to selected subreddits.');
+      const source = copied.source;
+      setPasteConfirm(false);
+      delete drafts.current[selected];
+      await refreshConfig(selected);
+      showToast(`Replaced r/${selected} with the configuration copied from r/${source}.`);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Save failed.');
+      showToast(error instanceof Error ? error.message : 'Could not paste that configuration.');
     } finally {
       setSaving(false);
     }
@@ -508,15 +664,65 @@ export const AdminApp = () => {
           <div>
             <p className="eyebrow">Moderator Configuration</p>
             <h1>Community Navigation Admin</h1>
-            <p className="hint">Configure this community’s navigation, then apply it to managed subreddit posts. {accessLevel === 'topModerator' ? 'You are the top moderator.' : 'You have delegated access from the top moderator.'}</p>
+            <p className="hint">Each connected subreddit keeps its own navigation. Use Editing to switch, then save only that community. {accessLevel === 'topModerator' ? 'You are the top moderator of this community.' : 'You have delegated access from the top moderator of this community.'}</p>
           </div>
-          <button type="button" className="primary" onClick={() => void save()} disabled={saving}>{saving ? 'Applying…' : 'Save & Apply'}</button>
+          <button type="button" className="primary" onClick={() => void save()} disabled={saving || !canEditSelected}>{saving ? 'Applying…' : `Save & Apply to r/${selected}`}</button>
         </header>
         {warnings.length > 0 && (
           <ul className="warning-list">
             {warnings.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
         )}
+        <section className="section">
+          <div className="section-title"><h2>Connected Subreddits</h2><span>{Math.max(communities.length - 1, 0)} connected</span></div>
+          <label className="background-style-select">Editing
+            <select value={selected} onChange={(event) => switchCommunity(event.target.value)}>
+              {communities.map((community) => (
+                <option key={community.subredditName} value={community.subredditName}>
+                  {community.role === 'home'
+                    ? `r/${community.subredditName} (this community)`
+                    : community.canEdit
+                      ? `r/${community.subredditName}`
+                      : `r/${community.subredditName} (top moderator only)`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="community-actions">
+            <button type="button" className="secondary" onClick={copyConfig} disabled={!canReadSelected || saving}>Copy Config</button>
+            <button type="button" className="secondary" onClick={requestPaste} disabled={!copied || !canEditSelected || copied.source === selected || saving}>Paste Config</button>
+            {selected !== homeSubreddit && (
+              <button type="button" className="danger" onClick={() => void disconnectSubreddit()} disabled={connecting || saving}>Disconnect</button>
+            )}
+          </div>
+          {pasteConfirm && copied && (
+            <div className="confirm-box" role="alertdialog" aria-label="Replace configuration">
+              <p>Replace r/{selected} with the config copied from r/{copied.source}? This overwrites its buttons, welcome media, backgrounds, and label styles.</p>
+              <div className="community-actions">
+                <button type="button" className="primary" onClick={() => void confirmPaste()} disabled={saving}>Replace Config</button>
+                <button type="button" className="secondary" onClick={() => setPasteConfirm(false)} disabled={saving}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div className="sub-add">
+            <input value={newSubreddit} onChange={(event) => setNewSubreddit(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void connectSubreddit(); }} placeholder="Subreddit name, e.g. YourSubreddit" />
+            <button type="button" className="secondary" onClick={() => void connectSubreddit()} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Subreddit'}</button>
+          </div>
+          <p className="hint">Type a subreddit name and choose Connect Subreddit. Reddit does not provide a list of communities you moderate, so the server checks the name: the app must already be installed there, and you must be its live top moderator. Connecting copies this community’s saved configuration, not unsaved edits. Save this community first if the new post should start from changes you have not saved yet.</p>
+          <p className="hint">Choose Editing to switch communities. Copy Config keeps the configuration on screen, including unsaved edits. Select another community, choose Paste Config, then Replace Config to overwrite it. Disconnect removes a community from this panel and keeps its navigation post.</p>
+          {selectedCommunity?.followsHome && selected !== homeSubreddit && (
+            <p className="hint">r/{selected} still shows this community’s saved configuration. Saving stores an independent copy on its navigation post.</p>
+          )}
+          {selectedCommunity?.postId && selected !== homeSubreddit && (
+            <div className="targets"><div className="target"><span>r/{selected}</span><small>{selectedCommunity.postId}</small></div></div>
+          )}
+          {targets.filter((target) => !communities.some((community) => community.subredditName === target.subredditName)).length > 0 && (
+            <p className="hint">Previously connected navigation posts are remembered, so connecting the same subreddit again updates that post.</p>
+          )}
+        </section>
+        {canReadSelected ? (
+        <fieldset className="editor-lock" disabled={!canEditSelected}>
+        {!canEditSelected && <p className="hint">You can copy this configuration. Only the live top moderator of r/{selected} can change or publish it.</p>}
         <section className="section">
           <div className="section-title"><h2>Welcome Screen</h2><span>{welcomeUrls.length} item{welcomeUrls.length === 1 ? '' : 's'}</span></div>
           <div className="upload-row">
@@ -594,65 +800,6 @@ export const AdminApp = () => {
           </div>
           <p className="hint">Custom backgrounds use Reddit-hosted images or GIFs from the asset library.</p>
         </section>
-        {accessLevel === 'topModerator' ? (
-          <section className="section">
-            <div className="section-title">
-              <h2>Moderator Access</h2>
-              <button type="button" className="secondary" onClick={() => void refreshModeratorRoster()} disabled={accessRefreshing}>{accessRefreshing ? 'Scanning…' : 'Scan Mod Team'}</button>
-            </div>
-            <p className="hint">Only the top moderator can grant or revoke admin access. The live moderator list is checked before every grant, and a moderator who leaves the team loses access immediately. Replacing this panel clears every grant.</p>
-            <div className="moderator-access-list">
-              {moderators.map((username) => {
-                const normalized = username.toLowerCase();
-                const isOwner = normalized === topModerator;
-                const granted = delegates.includes(normalized);
-                return (
-                  <div className="moderator-access-row" key={username}>
-                    <div>
-                      <strong>u/{username}</strong>
-                      <small>{isOwner ? 'Top moderator · owner' : granted ? 'Delegated admin' : 'Moderator'}</small>
-                    </div>
-                    {isOwner ? <span className="owner-pill">Full access</span> : (
-                      <button type="button" className={granted ? 'danger' : 'secondary'} onClick={() => void setModeratorAccess(username, !granted)} disabled={accessSaving === username || accessRefreshing}>
-                        {accessSaving === username ? 'Saving…' : granted ? 'Revoke Access' : 'Grant Access'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              {moderators.length === 0 && <p className="hint">{accessRefreshing ? 'Loading Reddit moderator roster…' : 'No moderator accounts were returned. Refresh the scan before changing access.'}</p>}
-            </div>
-          </section>
-        ) : (
-          <section className="section">
-            <div className="section-title"><h2>Moderator Access</h2><span>Delegated</span></div>
-            <p className="hint">The top moderator granted you portal access. Reddit moderator status is rechecked on every admin request. If you leave the moderator team, or the top moderator changes, this access stops.</p>
-          </section>
-        )}
-        <section className="section">
-          <div className="section-title"><h2>Managed Subreddits</h2><span>{config.managedSubreddits.length} selected</span></div>
-          <div className="sub-add">
-            <input value={newSubreddit} onChange={(event) => setNewSubreddit(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addSubreddit(); }} placeholder="Subreddit name, e.g. YourSubreddit" />
-            <button type="button" className="secondary" onClick={addSubreddit}>Add</button>
-          </div>
-          <div className="chips">
-            {config.managedSubreddits.map((name) => (
-              <button type="button" key={name} className="chip" onClick={() => setConfig((current) => ({ ...current, managedSubreddits: current.managedSubreddits.filter((item) => item !== name) }))}>r/{name} ×</button>
-            ))}
-          </div>
-          <p className="hint">The app must be installed in each selected subreddit, and you must moderate it. Save creates a missing navigation post or updates the existing one. Removing a subreddit stops updates but remembers its post, so adding it again does not create a duplicate. Moderators of a target subreddit do not gain access to this admin panel.</p>
-          <div className="targets">
-            {targets.map((target) => {
-              const selected = config.managedSubreddits.includes(target.subredditName.toLowerCase());
-              return (
-                <div key={target.postId} className="target">
-                  <span>r/{target.subredditName}</span>
-                  <small>{target.postId}{selected ? '' : ' · not selected'}</small>
-                </div>
-              );
-            })}
-          </div>
-        </section>
         <section className="section">
           <div className="section-title"><h2>Asset Library</h2><span>{config.assets.length} reusable assets</span></div>
           <div className="asset-grid">
@@ -665,7 +812,7 @@ export const AdminApp = () => {
             ))}
             {config.assets.length === 0 && <div className="empty-preview">No reusable assets configured</div>}
           </div>
-          <p className="hint">Assets are uploaded through Reddit and can be reused for welcome media, backgrounds, and icons. Deleting an asset clears references to it. Save & Apply stores the change.</p>
+          <p className="hint">Assets are uploaded through Reddit and can be reused for welcome media, backgrounds, and icons. Deleting an asset clears references to it. Save this community to store the change.</p>
         </section>
         <section className="section">
           <div className="section-title"><h2>Navigation Buttons</h2><button type="button" className="secondary" onClick={addButton}>+ Add Subreddit Button</button></div>
@@ -764,8 +911,50 @@ export const AdminApp = () => {
             ))}
           </div>
         </section>
+        </fieldset>
+        ) : (
+          <section className="section">
+            <h2>Configuration hidden</h2>
+            <p className="hint">Only the live top moderator of r/{selected} can view this configuration.</p>
+          </section>
+        )}
+        {accessLevel === 'topModerator' ? (
+          <section className="section">
+            <div className="section-title">
+              <h2>Moderator Access</h2>
+              <button type="button" className="secondary" onClick={() => void refreshModeratorRoster()} disabled={accessRefreshing}>{accessRefreshing ? 'Scanning…' : 'Scan Mod Team'}</button>
+            </div>
+            <p className="hint">Only the top moderator can grant or revoke admin access. The live moderator list is checked before every grant, and a moderator who leaves the team loses access immediately. Replacing this panel clears every grant.</p>
+            <div className="moderator-access-list">
+              {moderators.map((username) => {
+                const normalized = username.toLowerCase();
+                const isOwner = normalized === topModerator;
+                const granted = delegates.includes(normalized);
+                return (
+                  <div className="moderator-access-row" key={username}>
+                    <div>
+                      <strong>u/{username}</strong>
+                      <small>{isOwner ? 'Top moderator · owner' : granted ? 'Delegated admin' : 'Moderator'}</small>
+                    </div>
+                    {isOwner ? <span className="owner-pill">Full access</span> : (
+                      <button type="button" className={granted ? 'danger' : 'secondary'} onClick={() => void setModeratorAccess(username, !granted)} disabled={accessSaving === username || accessRefreshing}>
+                        {accessSaving === username ? 'Saving…' : granted ? 'Revoke Access' : 'Grant Access'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {moderators.length === 0 && <p className="hint">{accessRefreshing ? 'Loading Reddit moderator roster…' : 'No moderator accounts were returned. Refresh the scan before changing access.'}</p>}
+            </div>
+          </section>
+        ) : (
+          <section className="section">
+            <div className="section-title"><h2>Moderator Access</h2><span>Delegated</span></div>
+            <p className="hint">The top moderator granted you portal access. Reddit moderator status is rechecked on every admin request. If you leave the moderator team, or the top moderator changes, this access stops.</p>
+          </section>
+        )}
         <footer className="footer">
-          <button type="button" className="primary" onClick={() => void save()} disabled={saving}>{saving ? 'Applying…' : 'Save & Apply to Existing Posts'}</button>
+          <button type="button" className="primary" onClick={() => void save()} disabled={saving || !canEditSelected}>{saving ? 'Applying…' : `Save & Apply to r/${selected}`}</button>
           <p>Create Navigation Post remains a separate moderator action for a review post in this subreddit.</p>
         </footer>
       </div>
