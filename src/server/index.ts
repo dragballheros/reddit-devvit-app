@@ -110,37 +110,118 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
       }
     : APP_CONFIG;
 
-const requireModerator = async (subredditName?: string) =>
-  Boolean(subredditName && await isCurrentUserModerator(subredditName));
+const DELEGATED_ADMINS_PREFIX = 'community-portal:delegated-admins:';
 
-/**
- * Admin actions must run in a real admin-panel post in the current subreddit.
- * Moderator status alone must not turn any public navigation post into an
- * editable admin panel.
- */
-const requireAdminPanelModerator = async (): Promise<boolean> => {
-  const postId = toRedditPostId(context.postId);
-  const subredditName = normalizeManagedSubredditName(context.subredditName);
-  return Boolean(
-    postId &&
-    subredditName &&
-    isAdminPanelPostData(context.postData) &&
-    await requireModerator(subredditName)
-  );
-};
-
-const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
+const getCurrentUsername = async (): Promise<string | undefined> => {
   const user =
     context.userId
       ? await reddit.getUserById(context.userId)
       : context.username
         ? await reddit.getUserByUsername(context.username)
         : undefined;
+  return user?.username?.trim().toLowerCase() || context.username?.trim().toLowerCase() || undefined;
+};
 
-  if (!user) return false;
+const getDelegatedAdminsKey = (subredditName: string) =>
+  `${DELEGATED_ADMINS_PREFIX}${normalizeSubredditName(subredditName)}`;
 
-  const permissions = await user.getModPermissionsForSubreddit(subredditName);
-  return permissions.length > 0;
+const getDelegatedAdminUsernames = async (subredditName: string): Promise<string[]> => {
+  const raw = await redis.get(getDelegatedAdminsKey(subredditName));
+  if (!raw) return [];
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.filter((name): name is string =>
+      typeof name === 'string' && /^[a-z0-9_-]{1,20}$/i.test(name)
+    ).map((name) => name.trim().toLowerCase()))];
+  } catch {
+    return [];
+  }
+};
+
+const saveDelegatedAdminUsernames = async (subredditName: string, usernames: string[]) =>
+  redis.set(getDelegatedAdminsKey(subredditName), JSON.stringify([...new Set(usernames.map((name) => name.trim().toLowerCase()))]));
+
+/** Returns the current live moderator roster. Fail closed on API errors. */
+const getModeratorUsernames = async (subredditName: string): Promise<string[]> => {
+  const subreddit = await reddit.getSubredditByName(subredditName);
+  const moderators = await subreddit.getModerators().get(1000);
+  return [...new Set(moderators
+    .map((moderator) => moderator.username?.trim().toLowerCase())
+    .filter((username): username is string => Boolean(username)))];
+};
+
+const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
+  try {
+    const user =
+      context.userId
+        ? await reddit.getUserById(context.userId)
+        : context.username
+          ? await reddit.getUserByUsername(context.username)
+          : undefined;
+    if (!user) return false;
+    const permissions = await user.getModPermissionsForSubreddit(subredditName);
+    return permissions.length > 0;
+  } catch {
+    return false;
+  }
+};
+
+/** Reddit's first listed moderator is treated as the top moderator for this app. */
+const isCurrentUserSubredditOwner = async (subredditName: string): Promise<boolean> => {
+  try {
+    const username = await getCurrentUsername();
+    if (!username) return false;
+    const subreddit = await reddit.getSubredditByName(subredditName);
+    const moderators = await subreddit.getModerators().get(1);
+    const topModerator = moderators[0]?.username?.trim().toLowerCase();
+    return Boolean(topModerator && topModerator === username);
+  } catch (error) {
+    console.warn('Could not verify subreddit top moderator; denying owner-only action.', error);
+    return false;
+  }
+};
+
+/**
+ * Require the canonical admin post in this installation. A normal navigation
+ * post or stale admin post must never become a write surface.
+ */
+const isCanonicalAdminPanelContext = async (): Promise<boolean> => {
+  const postId = toRedditPostId(context.postId);
+  const subredditName = normalizeManagedSubredditName(context.subredditName);
+  const canonicalAdminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
+  if (!postId || !subredditName || postId !== canonicalAdminPostId || !isAdminPanelPostData(context.postData)) {
+    return false;
+  }
+  try {
+    const post = await reddit.getPostById(postId);
+    if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) return false;
+    return isAdminPanelPostData(await reddit.getPostData(postId));
+  } catch {
+    return false;
+  }
+};
+
+/** Only the top moderator can manage delegated admin grants. */
+const requireAdminPanelOwner = async (): Promise<boolean> => {
+  const subredditName = normalizeManagedSubredditName(context.subredditName);
+  return Boolean(subredditName && await isCanonicalAdminPanelContext() && await isCurrentUserSubredditOwner(subredditName));
+};
+
+/**
+ * Top moderator or explicitly delegated moderator may configure the portal.
+ * A delegate is checked against Reddit's live moderator permissions on every
+ * request, so a removed moderator loses access immediately even if a stale
+ * grant remains in Redis.
+ */
+const requireAdminPanelAccess = async (): Promise<boolean> => {
+  const subredditName = normalizeManagedSubredditName(context.subredditName);
+  if (!subredditName || !(await isCanonicalAdminPanelContext())) return false;
+  if (await isCurrentUserSubredditOwner(subredditName)) return true;
+  if (!(await isCurrentUserModerator(subredditName))) return false;
+  const username = await getCurrentUsername();
+  if (!username) return false;
+  return (await getDelegatedAdminUsernames(subredditName)).includes(username);
 };
 
 app.get('/api/runtime-config', async (c) => {
@@ -160,14 +241,75 @@ app.get('/api/runtime-config', async (c) => {
 
 app.get('/api/admin/config', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelAccess())) {
+      return c.json({ error: 'Top-moderator or delegated moderator access required.' }, 403);
     }
     const config = await getAdminConfigFromPost(context.postId) ?? getDefaultAdminConfig();
-    return c.json({ config, targets: await getTargetPosts(), adminPostId: context.postId });
+    const subredditName = normalizeManagedSubredditName(context.subredditName)!;
+    const isOwner = await isCurrentUserSubredditOwner(subredditName);
+    return c.json({
+      config,
+      targets: await getTargetPosts(),
+      adminPostId: context.postId,
+      accessLevel: isOwner ? 'topModerator' : 'delegatedModerator',
+      canManageAccess: isOwner,
+    });
   } catch (error) {
     console.error('Failed to load admin config', error);
     return c.json({ error: 'Failed to load admin configuration.' }, 500);
+  }
+});
+
+app.get('/api/admin/access', async (c) => {
+  try {
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Only this subreddit’s top moderator can manage admin access.' }, 403);
+    }
+    const subredditName = normalizeManagedSubredditName(context.subredditName)!;
+    const [moderators, storedDelegates] = await Promise.all([
+      getModeratorUsernames(subredditName),
+      getDelegatedAdminUsernames(subredditName),
+    ]);
+    // Prune stale grants during a top-moderator roster refresh. Runtime access
+    // checks already deny removed moderators even before this cleanup occurs.
+    const currentSet = new Set(moderators);
+    const delegates = storedDelegates.filter((username) => currentSet.has(username));
+    if (delegates.length !== storedDelegates.length) {
+      await saveDelegatedAdminUsernames(subredditName, delegates);
+    }
+    return c.json({ moderators, delegates, scannedAt: Date.now() });
+  } catch (error) {
+    console.error('Failed to scan subreddit moderator team', error);
+    return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
+  }
+});
+
+app.post('/api/admin/access', async (c) => {
+  try {
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Only this subreddit’s top moderator can grant or revoke admin access.' }, 403);
+    }
+    const payload = await c.req.json<{ username?: string; granted?: boolean }>();
+    const username = typeof payload.username === 'string' ? payload.username.trim().replace(/^u\//i, '').toLowerCase() : '';
+    if (!/^[a-z0-9_-]{1,20}$/i.test(username) || typeof payload.granted !== 'boolean') {
+      return c.json({ error: 'Choose a valid moderator and grant or revoke access.' }, 400);
+    }
+    const subredditName = normalizeManagedSubredditName(context.subredditName)!;
+    const moderators = await getModeratorUsernames(subredditName);
+    if (!moderators.includes(username)) {
+      const current = (await getDelegatedAdminUsernames(subredditName)).filter((name) => name !== username);
+      await saveDelegatedAdminUsernames(subredditName, current);
+      return c.json({ error: 'That account is not currently a moderator. Access was not granted.' }, 409);
+    }
+    const current = await getDelegatedAdminUsernames(subredditName);
+    const next = payload.granted
+      ? [...new Set([...current, username])]
+      : current.filter((name) => name !== username);
+    await saveDelegatedAdminUsernames(subredditName, next);
+    return c.json({ ok: true, username, granted: payload.granted, delegates: next });
+  } catch (error) {
+    console.error('Failed to update delegated moderator access', error);
+    return c.json({ error: 'Could not verify the live moderator team. No access changes were made.' }, 502);
   }
 });
 
