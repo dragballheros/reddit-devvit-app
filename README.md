@@ -14,7 +14,7 @@ Inline, the card shows:
 - **Previous** and **Next** chevrons when more than one page is needed. Tapping one slides the next set of buttons in. **Previous** is hidden on the first page, **Next** is hidden on the last page, and both are hidden when every button fits on one page. A page indicator such as `1 / 3` appears only when there is more than one page.
 - **Open full menu**, which asks Reddit to open the expanded view.
 
-The expanded view can scroll. It shows the welcome image or GIF when one is configured, **Subreddit Menu**, and every subreddit button. If several welcome files are saved, one is chosen at random on each load.
+The expanded view can scroll. It shows the welcome image or GIF when one is configured, **Subreddit Menu**, and every subreddit button. If several welcome files are saved, one is chosen at random on each load. Welcome media defaults to **Blurred fill**: the file stays sharp and fully visible in the center, and a second copy of the same file is scaled to cover the frame, blurred, and slightly darkened behind it. That fills the empty bars when a widescreen file sits in a taller frame, or the reverse. **Large / fill height** and **Fit app canvas** are the other **Display** choices. The blur is one background layer. Reduced motion keeps that still fill and skips the decorative title motion.
 
 Every public button can use an **Electric**, **Glow**, or **None** outline. Electric is the default: a bright segment in that button’s accent color travels around the border. Glow is a steady accent ring. None is a plain light ring. With reduced motion, Electric becomes a steady glow and the page change is instant.
 
@@ -27,7 +27,7 @@ Every public button can use an **Electric**, **Glow**, or **None** outline. Elec
 
 The **Community Navigation Admin** panel is a separate custom post. Inline, it is a fixed launcher with **Open admin editor** and does not scroll. The form scrolls only after that control opens the expanded editor.
 
-- Welcome images and GIFs, including how each one is fitted.
+- Welcome images and GIFs, including how each one is fitted. **Blurred fill** is the default. **Large / fill height** and **Fit app canvas** are the other choices.
 - Petal or custom backgrounds.
 - Subreddit buttons: label, destination, accent, outline (**Electric**, **Glow**, or **None**), label color, font, size, weight, gradient, icon, background, and background position/scale. A button can be disabled without deleting it. Omitting the outline keeps **Electric**.
 - An asset library of Reddit-hosted images and GIFs. Deleting an asset clears references to it.

@@ -16,6 +16,7 @@ import {
   type BackgroundStyle,
   type ManagedAsset,
   type ManagedButton,
+  WELCOME_GIF_FITS,
   type WelcomeGifFit,
 } from '../shared/subreddit';
 import { useWebViewMode } from './useWebViewMode';
@@ -354,7 +355,7 @@ export const AdminApp = () => {
               welcomeGifVariants: [...(current.welcomeGifVariants ?? (current.welcomeGif ? [current.welcomeGif] : [])), uploaded.url],
               welcomeGifFitByUrl: {
                 ...(current.welcomeGifFitByUrl ?? {}),
-                [uploaded.url]: 'natural' as WelcomeGifFit,
+                [uploaded.url]: 'blurred' as WelcomeGifFit,
               },
             }
           : {}),
@@ -733,14 +734,13 @@ export const AdminApp = () => {
                   <img src={url} className="preview-gif" alt={`Welcome media ${index + 1}`} />
                   <label className="welcome-gif-fit">Display
                     <select
-                      value={config.welcomeGifFitByUrl?.[url] ?? 'natural'}
+                      value={config.welcomeGifFitByUrl?.[url] ?? 'blurred'}
                       onChange={(event) => setConfig((current) => ({
                         ...current,
                         welcomeGifFitByUrl: { ...(current.welcomeGifFitByUrl ?? {}), [url]: event.target.value as WelcomeGifFit },
                       }))}
                     >
-                      <option value="natural">Large / fill height</option>
-                      <option value="canvas">Fit app canvas</option>
+                      {WELCOME_GIF_FITS.map((fit) => <option key={fit.id} value={fit.id}>{fit.label}</option>)}
                     </select>
                   </label>
                   <button
@@ -764,7 +764,7 @@ export const AdminApp = () => {
               {welcomeUrls.length > 0 && (
                 <button type="button" className="ghost" onClick={() => setConfig((current) => ({ ...current, welcomeGif: undefined, welcomeGifVariants: [], welcomeGifFitByUrl: {} }))}>Clear Welcome Media</button>
               )}
-              <p className="hint">Add SFW images or GIFs. One is selected at random each time the expanded post loads. Remove them all to skip the intro.</p>
+              <p className="hint">Add SFW images or GIFs. One is selected at random each time the expanded post loads. Blurred fill is the default: the file stays fully visible, and a blurred copy of the same file fills any empty bars. Remove them all to skip the intro.</p>
             </div>
           </div>
         </section>

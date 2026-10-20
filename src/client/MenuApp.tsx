@@ -249,7 +249,7 @@ export const MenuApp = () => {
     () => pickRandomItem(configuredWelcomeGifs, ''),
     [configuredWelcomeGifs],
   );
-  const sessionGifFit = config.welcomeGifFitByUrl?.[sessionGifSrc] ?? 'natural';
+  const sessionGifFit = config.welcomeGifFitByUrl?.[sessionGifSrc] ?? 'blurred';
 
   const subredditTitle = getSubredditTitle(context?.subredditName);
   const subredditLabel = getSubredditLabel(context?.subredditName);
@@ -440,26 +440,49 @@ export const MenuApp = () => {
 
       {hasWelcomeGif && (
         <section className={`intro ${isIntroHidden ? 'intro--hidden' : ''}`}>
-          <img
-            className="intro__media intro__media--wide"
-            src={sessionGifSrc}
-            alt="Welcome animation"
-            loading="eager"
-            decoding="sync"
-            fetchPriority="high"
-            onError={() => setIsIntroHidden(true)}
-            style={{
-              objectFit: config.introGifFit,
-              ...(sessionGifFit === 'canvas'
-                ? {
-                    width: '100%',
-                    height: '100%',
-                    maxWidth: 'none',
-                    maxHeight: 'none',
-                  }
-                : {}),
-            }}
-          />
+          {sessionGifFit === 'blurred' ? (
+            <div className="intro__frame intro__frame--blurred">
+              <img
+                className="intro__fill"
+                src={sessionGifSrc}
+                alt=""
+                aria-hidden="true"
+                loading="eager"
+                decoding="sync"
+              />
+              <div className="intro__shade" aria-hidden="true" />
+              <img
+                className="intro__media intro__media--contained"
+                src={sessionGifSrc}
+                alt="Welcome animation"
+                loading="eager"
+                decoding="sync"
+                fetchPriority="high"
+                onError={() => setIsIntroHidden(true)}
+              />
+            </div>
+          ) : (
+            <img
+              className="intro__media intro__media--wide"
+              src={sessionGifSrc}
+              alt="Welcome animation"
+              loading="eager"
+              decoding="sync"
+              fetchPriority="high"
+              onError={() => setIsIntroHidden(true)}
+              style={{
+                objectFit: config.introGifFit,
+                ...(sessionGifFit === 'canvas'
+                  ? {
+                      width: '100%',
+                      height: '100%',
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                    }
+                  : {}),
+              }}
+            />
+          )}
           <div className="intro__title" aria-label={subredditTitle}>
             {Array.from(subredditTitle).map((char, index) => (
               <span

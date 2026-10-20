@@ -244,6 +244,39 @@ const coercedOutline = normalizeAdminConfig({
 assert.equal(coercedOutline.ok, true);
 if (coercedOutline.ok) assert.equal(coercedOutline.config.buttons[0]?.outlineStyle, undefined);
 
+const welcomeUrl = 'https://i.redd.it/welcome.gif';
+const blurredFit = normalizeAdminConfig({
+  version: 1,
+  buttons: [],
+  managedSubreddits: [],
+  assets: [],
+  welcomeGifVariants: [welcomeUrl],
+  welcomeGifFitByUrl: { [welcomeUrl]: 'blurred' },
+}, 'strict');
+assert.equal(blurredFit.ok, true);
+if (blurredFit.ok) assert.equal(blurredFit.config.welcomeGifFitByUrl[welcomeUrl], 'blurred');
+
+const rejectedFit = normalizeAdminConfig({
+  version: 1,
+  buttons: [],
+  managedSubreddits: [],
+  assets: [],
+  welcomeGifVariants: [welcomeUrl],
+  welcomeGifFitByUrl: { [welcomeUrl]: 'stretch' },
+}, 'strict');
+assert.equal(rejectedFit.ok, false);
+
+const coercedFit = normalizeAdminConfig({
+  version: 1,
+  buttons: [],
+  managedSubreddits: [],
+  assets: [],
+  welcomeGifVariants: [welcomeUrl],
+  welcomeGifFitByUrl: { [welcomeUrl]: 'stretch' },
+}, 'coerce');
+assert.equal(coercedFit.ok, true);
+if (coercedFit.ok) assert.equal(coercedFit.config.welcomeGifFitByUrl[welcomeUrl], undefined);
+
 const adminUi = await readFile(new URL('../src/client/admin.tsx', import.meta.url), 'utf8');
 const menuUi = await readFile(new URL('../src/client/MenuApp.tsx', import.meta.url), 'utf8');
 assert.match(adminUi, /Connected Subreddits/);
@@ -264,6 +297,10 @@ assert.match(sharedUi, /label: 'Electric'/);
 assert.match(sharedUi, /label: 'Glow'/);
 assert.match(sharedUi, /label: 'None'/);
 assert.match(sharedUi, /not Electric, Glow, or None/);
+assert.match(sharedUi, /label: 'Blurred fill'/);
+assert.match(adminUi, /WELCOME_GIF_FITS\.map/);
+assert.match(menuUi, /intro__fill/);
+assert.match(menuUi, /\?\? 'blurred'/);
 assert.match(adminUi, /Admin access required/);
 assert.match(adminUi, /setAccessDenied/);
 assert.match(adminUi, /Subreddit Menu/);
@@ -288,6 +325,8 @@ assert.match(menuCss, /\.app--expanded \.portal-grid/);
 assert.match(menuCss, /prefers-reduced-motion/);
 assert.doesNotMatch(menuCss, /overscroll-behavior-y:\s*contain/);
 assert.doesNotMatch(menuCss, /96vh|94vh|100vh|100dvh/);
+assert.match(menuCss, /\.intro__fill \{[^}]*filter:\s*blur\(/);
+assert.doesNotMatch(menuCss, /\.intro__media--contained \{[^}]*filter:\s*blur\(/);
 const adminCss = await readFile(new URL('../src/client/admin.css', import.meta.url), 'utf8');
 assert.match(adminCss, /\.admin--inline\{[^}]*overflow:\s*hidden/);
 const webViewMode = await readFile(new URL('../src/client/useWebViewMode.ts', import.meta.url), 'utf8');

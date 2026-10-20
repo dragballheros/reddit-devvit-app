@@ -22,7 +22,13 @@ export type ManagedButton = {
 
 export type ManagedAsset = { id: string; name: string; url: string; type: 'image' | 'gif' };
 
-export type WelcomeGifFit = 'natural' | 'canvas';
+export type WelcomeGifFit = 'blurred' | 'natural' | 'canvas';
+
+export const WELCOME_GIF_FITS = [
+  { id: 'blurred', label: 'Blurred fill' },
+  { id: 'natural', label: 'Large / fill height' },
+  { id: 'canvas', label: 'Fit app canvas' },
+] as const;
 export type BackgroundStyle = 'petals' | 'custom';
 export type OutlineStyle = 'electric' | 'glow' | 'none';
 
@@ -430,9 +436,17 @@ export const normalizeAdminConfig = (value: unknown, mode: 'strict' | 'coerce'):
   }
 
   const welcomeGifFitByUrl: Record<string, WelcomeGifFit> = {};
+  const welcomeFitValues = new Set<string>(WELCOME_GIF_FITS.map((fit) => fit.id));
   for (const url of welcomeGifVariants) {
-    const fit = raw.welcomeGifFitByUrl?.[url];
-    if (fit === 'canvas' || fit === 'natural') welcomeGifFitByUrl[url] = fit;
+    const fit = (raw.welcomeGifFitByUrl as Record<string, unknown> | undefined)?.[url];
+    if (fit == null || fit === '') continue;
+    if (typeof fit === 'string' && welcomeFitValues.has(fit)) {
+      welcomeGifFitByUrl[url] = fit as WelcomeGifFit;
+      continue;
+    }
+    const message = 'A welcome image has a display fit that is not Blurred fill, Large / fill height, or Fit app canvas.';
+    if (mode === 'strict') return { ok: false, error: message };
+    warnings.push(message);
   }
 
   const customBackground = optionalMedia(raw.customBackground, 'Custom background', mode, warnings);
