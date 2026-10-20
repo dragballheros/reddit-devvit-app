@@ -84,15 +84,28 @@ export const LABEL_FONTS = [
 ] as const;
 
 export const LABEL_SIZES = [
-  { id: 'small', label: 'Small', value: '0.95rem' },
-  { id: 'medium', label: 'Medium', value: '1.15rem' },
-  { id: 'large', label: 'Large', value: '1.35rem' },
+  { id: 'small', label: 'Small', value: '1.25rem' },
+  { id: 'medium', label: 'Medium', value: '1.55rem' },
+  { id: 'large', label: 'Large', value: '1.85rem' },
 ] as const;
+
+/** Earlier builds stored these sizes. They still mean Small, Medium, and Large. */
+const LEGACY_LABEL_SIZES: Record<string, (typeof LABEL_SIZES)[number]['value']> = {
+  '0.95rem': '1.25rem',
+  '1.15rem': '1.55rem',
+  '1.35rem': '1.85rem',
+};
 
 export const LABEL_WEIGHTS = [600, 700, 800] as const;
 
 const LABEL_FONT_VALUES = new Set<string>(LABEL_FONTS.map((font) => font.value));
 const LABEL_SIZE_VALUES = new Set<string>(LABEL_SIZES.map((size) => size.value));
+
+export const resolveLabelSize = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  if (LABEL_SIZE_VALUES.has(value)) return value;
+  return LEGACY_LABEL_SIZES[value];
+};
 const LABEL_WEIGHT_VALUES = new Set<number>(LABEL_WEIGHTS);
 const OUTLINE_STYLE_VALUES = new Set<string>(OUTLINE_STYLES.map((style) => style.id));
 export const normalizeSubredditName = (subredditName?: string | null): string =>
@@ -382,7 +395,7 @@ export const normalizeAdminConfig = (value: unknown, mode: 'strict' | 'coerce'):
       backgroundGradient,
       icon,
       labelFont: typeof button.labelFont === 'string' && LABEL_FONT_VALUES.has(button.labelFont) ? button.labelFont : undefined,
-      labelSize: typeof button.labelSize === 'string' && LABEL_SIZE_VALUES.has(button.labelSize) ? button.labelSize : undefined,
+      labelSize: resolveLabelSize(button.labelSize),
       labelColor: sanitizeColor(button.labelColor),
       labelWeight: typeof button.labelWeight === 'number' && LABEL_WEIGHT_VALUES.has(button.labelWeight) ? button.labelWeight : undefined,
       backgroundPositionX: clampNumber(button.backgroundPositionX, 0, 100),

@@ -7,6 +7,7 @@ import {
   isAdminPanelPostData,
   isRedditHostedMediaUrl,
   normalizeAdminConfig,
+  resolveLabelSize,
   welcomeFitForAspect,
   normalizeManagedSubredditName,
   readOwnSubredditConfigPayload,
@@ -158,6 +159,12 @@ const valid = normalizeAdminConfig({
   welcomeGifVariants: ['https://i.redd.it/welcome.gif'],
   backgroundStyle: 'petals',
 }, 'strict');
+assert.equal(resolveLabelSize('0.95rem'), '1.25rem');
+assert.equal(resolveLabelSize('1.15rem'), '1.55rem');
+assert.equal(resolveLabelSize('1.35rem'), '1.85rem');
+assert.equal(resolveLabelSize('1.85rem'), '1.85rem');
+assert.equal(resolveLabelSize('9rem'), undefined);
+
 assert.equal(valid.ok, true);
 if (valid.ok) {
   assert.equal(valid.config.buttons[0].url, 'https://www.reddit.com/r/example_sub/');
@@ -394,7 +401,18 @@ assert.match(menuCss, /\.intro__frame--side \.intro__media--contained/);
 assert.match(menuCss, /\.intro__frame--band \.intro__media--contained/);
 assert.match(menuUi, /intro__frame--\$\{blurModifier\}/);
 assert.match(menuUi, /app app--expanded /);
-assert.match(menuUi, /app app--inline \$\{isIntroHidden \? 'app--ready' : 'app--intro'\}/);
+assert.match(menuUi, /app app--inline \$\{introPhase === 'done' \? 'app--ready' : 'app--intro'\}/);
+assert.match(menuUi, /image\.decode\(/);
+assert.match(menuUi, /INTRO_LOAD_TIMEOUT_MS/);
+assert.match(menuUi, /intro__loader/);
+assert.match(menuUi, /new ResizeObserver/);
+assert.match(menuUi, /--label-shift/);
+assert.match(menuCss, /label-marquee/);
+assert.match(menuCss, /gold-sheen/);
+assert.match(menuCss, /\.portal-button__label \{[^}]*font-size:\s*var\(--portal-label-size/);
+assert.doesNotMatch(menuCss, /\.app--inline \.portal-button__label \{[^}]*font-size:\s*1rem/);
+assert.match(menuCss, /prefers-reduced-motion[\s\S]*subreddit-menu__sheen[\s\S]*animation:\s*none/);
+assert.match(menuCss, /prefers-reduced-motion[\s\S]*portal-button__label-face[\s\S]*text-overflow:\s*ellipsis/);
 const inlineBranch = menuUi.slice(menuUi.indexOf("if (mode === 'inline')"), menuUi.indexOf('app app--expanded'));
 assert.match(inlineBranch, /\{welcomeIntro\}/);
 assert.match(menuCss, /\.app--inline \.portal-button__icon-shell \{[^}]*max-height:\s*76px/);

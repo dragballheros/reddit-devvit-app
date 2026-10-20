@@ -433,17 +433,48 @@ button { font: inherit; }
   display: block;
   min-width: 0;
   overflow: hidden;
-  color: var(--portal-label-color, rgba(255,255,255,0.97));
   font-family: var(--portal-label-font, Inter, ui-sans-serif, system-ui, sans-serif);
-  font-size: var(--portal-label-size, 1.15rem);
+  font-size: var(--portal-label-size, 1.55rem);
   font-weight: var(--portal-label-weight, 800);
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-  text-overflow: ellipsis;
+  letter-spacing: 0.04em;
+  line-height: 1.12;
+}
+
+.portal-button__label-track {
+  position: relative;
+  display: inline-block;
+  max-width: none;
   white-space: nowrap;
-  text-shadow:
-    0 1px 2px rgba(0,0,0,0.9),
-    0 0 12px color-mix(in srgb, var(--portal-accent) 40%, transparent);
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
+.portal-button__label-track--marquee {
+  animation: label-marquee var(--label-marquee-duration, 10s) linear infinite;
+}
+
+.portal-button__label-face,
+.portal-button__label-glow {
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.portal-button__label-face {
+  display: inline-block;
+  color: var(--portal-label-color, rgba(255,255,255,0.97));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.portal-button__label-glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: transparent;
+  text-shadow: 0 0 10px var(--portal-accent, #fff);
+  pointer-events: none;
+  animation: label-glow 2.8s ease-in-out infinite;
 }
 
 .portal-button__energy,
@@ -482,6 +513,32 @@ button { font: inherit; }
   opacity: 0;
   pointer-events: none;
   transform: scale(1.025);
+}
+
+.intro--loading .intro__frame,
+.intro--loading .intro__media,
+.intro--loading .intro__title {
+  visibility: hidden;
+}
+
+.intro__loader {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.intro__loader-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-top-color: rgba(255, 214, 140, 0.95);
+  transform: translateZ(0);
+  animation: intro-spin 0.9s linear infinite;
 }
 
 .intro__frame {
@@ -907,7 +964,7 @@ button { font: inherit; }
   margin-right: 10px;
 }
 
-.app--inline .portal-button__label { font-size: 1rem; }
+.app--inline .portal-button__label { letter-spacing: 0.03em; }
 
 .carousel__controls {
   flex: 0 0 auto;
@@ -926,8 +983,7 @@ button { font: inherit; }
   margin-right: auto;
 }
 
-.carousel__arrow,
-.subreddit-menu {
+.carousel__arrow {
   color: white;
   cursor: pointer;
 }
@@ -967,38 +1023,118 @@ button { font: inherit; }
   flex: 1 1 auto;
   min-width: 0;
   min-height: 48px;
-  padding: 0 18px;
+  padding: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   overflow: hidden;
   border: 0;
   border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+  box-shadow:
+    0 0 14px rgba(232, 184, 74, 0.45),
+    0 8px 18px rgba(74, 48, 8, 0.35);
+}
+
+.subreddit-menu:focus-visible {
+  outline: 2px solid #fff1c2;
+  outline-offset: 3px;
+}
+
+.subreddit-menu:active {
+  transform: scale(0.985);
+}
+
+.subreddit-menu__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.subreddit-menu__ring::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220%;
+  aspect-ratio: 1;
+  transform: translate3d(-50%, -50%, 0);
+  background: conic-gradient(
+    from 0deg,
+    #8d6a22 0deg,
+    #ffe7a8 50deg,
+    #fff8e4 80deg,
+    #e0b44a 140deg,
+    #8d6a22 180deg,
+    #ffe7a8 240deg,
+    #fff6d4 280deg,
+    #c9963a 330deg,
+    #8d6a22 360deg
+  );
+  animation: gold-spin 3.4s linear infinite;
+}
+
+.subreddit-menu__face {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  margin: 3px;
+  min-width: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0) 40%),
+    linear-gradient(165deg, #fff6d0 0%, #f3d27a 24%, #e0b44a 50%, #f8e7b0 74%, #c9963a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(110, 68, 10, 0.28);
+}
+
+.subreddit-menu__sheen {
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: 0;
+  width: 46%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 248, 220, 0.15) 28%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(255, 248, 220, 0.15) 72%,
+    transparent 100%
+  );
+  transform: translate3d(-160%, 0, 0) skewX(-16deg);
+  animation: gold-sheen 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.subreddit-menu__label {
+  position: relative;
+  z-index: 1;
+  padding: 0 16px;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 38%),
-    linear-gradient(120deg, #173056 0%, #3a2468 52%, #12384a 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 0 0 1px rgba(140, 214, 255, 0.55),
-    0 10px 22px rgba(18, 24, 48, 0.45);
-}
-
-.subreddit-menu::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(100deg, transparent 18%, rgba(255, 255, 255, 0.16) 48%, transparent 78%);
+  color: #2c1d08;
+  text-shadow: 0 1px 0 rgba(255, 248, 226, 0.7);
 }
 
 .app--expanded .subreddit-menu {
   flex: 0 0 auto;
   width: 100%;
   min-height: 68px;
+}
+
+.app--expanded .subreddit-menu__label {
   font-size: 0.95rem;
 }
 
@@ -1025,6 +1161,48 @@ button { font: inherit; }
   82% { opacity: 0.72; }
 }
 
+@keyframes gold-spin {
+  to { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
+}
+
+@keyframes gold-sheen {
+  0%, 12% { transform: translate3d(-160%, 0, 0) skewX(-16deg); }
+  58% { transform: translate3d(240%, 0, 0) skewX(-16deg); }
+  100% { transform: translate3d(240%, 0, 0) skewX(-16deg); }
+}
+
+@keyframes intro-spin {
+  to { transform: translateZ(0) rotate(360deg); }
+}
+
+@keyframes label-glow {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes label-marquee {
+  0%, 14% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  58%, 70% {
+    transform: translate3d(var(--label-shift, 0px), 0, 0);
+    opacity: 1;
+  }
+  78% {
+    transform: translate3d(var(--label-shift, 0px), 0, 0);
+    opacity: 0;
+  }
+  78.2%, 82% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  92%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu__petal { animation: none !important; opacity: 0 !important; }
 
@@ -1040,5 +1218,35 @@ button { font: inherit; }
   .portal-button--electric .portal-button__outline {
     background: color-mix(in srgb, var(--portal-accent) 88%, white);
     box-shadow: 0 0 12px color-mix(in srgb, var(--portal-accent) 40%, transparent);
+  }
+
+  .subreddit-menu__sheen,
+  .subreddit-menu__ring::before,
+  .portal-button__label-glow,
+  .portal-button__label-track--marquee,
+  .intro__loader-ring {
+    animation: none !important;
+  }
+
+  .subreddit-menu__sheen,
+  .portal-button__label-glow {
+    opacity: 0;
+  }
+
+  .portal-button__label-track,
+  .portal-button__label-track--marquee {
+    transform: none !important;
+    opacity: 1 !important;
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .portal-button__label-face {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

@@ -1,21 +1,25 @@
 import './index.css';
 
 import { context, navigateTo } from '@devvit/web/client';
-import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { Component, type ErrorInfo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useWebViewMode } from './useWebViewMode';
 import {
   APP_CONFIG,
+  LABEL_SIZES,
   getSubredditAboutLink,
   getSubredditLabel,
   getSubredditLink,
   getSubredditNameFromUrl,
   getSubredditTitle,
+  resolveLabelSize,
   type OutlineStyle,
 } from '../shared/subreddit';
 
 const INTRO_DURATION_MS = 1900;
 const MOBILE_INTRO_DURATION_MS = 1900;
+const INTRO_LOAD_TIMEOUT_MS = 8000;
 const INLINE_PAGE_SIZE = 4;
+type IntroPhase = 'loading' | 'playing' | 'done';
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -141,6 +145,66 @@ const useIsMobile = () => {
   return isMobile;
 };
 
+const LabelText = ({ label }: { label: string }) => {
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const faceRef = useRef<HTMLSpanElement>(null);
+  const [shift, setShift] = useState(0);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const face = faceRef.current;
+    if (!container || !face) return;
+
+    const measure = () => {
+      if (container.clientWidth <= 0) return;
+      const extra = face.scrollWidth - container.clientWidth;
+      setShift(extra > 1 ? Math.ceil(extra) : 0);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    observer.observe(face);
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) measure();
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [label]);
+
+  const overflowing = shift > 0;
+  const duration = Math.min(16, Math.max(8, 6 + shift / 28));
+
+  return (
+    <span className="portal-button__label" ref={containerRef}>
+      <span
+        className={`portal-button__label-track${overflowing ? ' portal-button__label-track--marquee' : ''}`}
+        style={overflowing ? {
+          '--label-shift': `-${shift}px`,
+          '--label-marquee-duration': `${duration}s`,
+        } as React.CSSProperties : undefined}
+      >
+        <span className="portal-button__label-glow" aria-hidden="true">{label}</span>
+        <span className="portal-button__label-face" ref={faceRef}>{label}</span>
+      </span>
+    </span>
+  );
+};
+
+const SubredditMenuButton = ({ onClick }: { onClick: () => void }) => (
+  <button type="button" id="builtin-subreddit-menu" className="subreddit-menu" onClick={onClick}>
+    <span className="subreddit-menu__ring" aria-hidden="true" />
+    <span className="subreddit-menu__face">
+      <span className="subreddit-menu__sheen" aria-hidden="true" />
+      <span className="subreddit-menu__label">Subreddit Menu</span>
+    </span>
+  </button>
+);
+
 const PortalButton = ({
   label,
   onClick,
@@ -168,7 +232,7 @@ const PortalButton = ({
           '--portal-index': index,
           '--portal-gradient': backgroundGradient ?? 'linear-gradient(120deg, #111827, #000000)',
           '--portal-label-font': labelFont ?? 'Inter, ui-sans-serif, system-ui, sans-serif',
-          '--portal-label-size': labelSize ?? 'clamp(0.9rem, 2.1vw, 1.35rem)',
+          '--portal-label-size': resolveLabelSize(labelSize) ?? LABEL_SIZES[1].value,
           '--portal-label-color': labelColor ?? 'rgba(255,255,255,0.97)',
           '--portal-label-weight': labelWeight ?? 800,
         } as React.CSSProperties
@@ -195,7 +259,7 @@ const PortalButton = ({
         )}
       </span>
       <span className="portal-button__content">
-        <span className="portal-button__label">{label}</span>
+        <LabelText label={label} />
       </span>
       <span className="portal-button__energy portal-button__energy--one" aria-hidden="true" />
       <span className="portal-button__energy portal-button__energy--two" aria-hidden="true" />
@@ -224,7 +288,10 @@ const chunkPortals = <T,>(items: T[], size: number): T[][] => {
 
 export const MenuApp = () => {
   const mode = useWebViewMode();
-  const [isIntroHidden, setIsIntroHidden] = useState(false);
+  const [introPhase, setIntroPhase] = useState<IntroPhase>('loading');
+  const [mediaReady, setMediaReady] = useState(false);
+  const welcomeMediaRef = useRef<HTMLImageElement | null>(null);
+  const introTokenRef = useRef(0);
   const [config, setConfig] = useState(APP_CONFIG);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [page, setPage] = useState(0);
@@ -268,17 +335,60 @@ export const MenuApp = () => {
   const subredditLabel = getSubredditLabel(context?.subredditName);
 
   useEffect(() => {
+    if (!configLoaded) return;
+    const token = ++introTokenRef.current;
     if (!hasWelcomeGif) {
-      setIsIntroHidden(true);
+      setMediaReady(false);
+      setIntroPhase('done');
       return;
     }
 
-    setIsIntroHidden(false);
+    setMediaReady(false);
+    setIntroPhase('loading');
+    const image = welcomeMediaRef.current;
+    const current = () => introTokenRef.current === token;
+    if (image && typeof image.decode === 'function') {
+      image.decode().then(() => {
+        if (!current()) return;
+        if (image.naturalWidth > 0) setMediaReady(true);
+        else if (image.complete) setIntroPhase('done');
+      }).catch(() => {
+        if (!current()) return;
+        if (image.naturalWidth > 0) setMediaReady(true);
+        else if (image.complete) setIntroPhase('done');
+      });
+    } else if (image?.complete) {
+      if (image.naturalWidth > 0) setMediaReady(true);
+      else setIntroPhase('done');
+    }
+
+    return () => { introTokenRef.current += 1; };
+  }, [configLoaded, hasWelcomeGif, sessionGifSrc, mode]);
+
+  useEffect(() => {
+    if (!configLoaded || !hasWelcomeGif || mediaReady || introPhase !== 'loading') return;
+    const token = introTokenRef.current;
+    const timer = window.setTimeout(() => {
+      if (introTokenRef.current !== token) return;
+      introTokenRef.current += 1;
+      setIntroPhase('done');
+    }, INTRO_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [configLoaded, hasWelcomeGif, mediaReady, introPhase, sessionGifSrc, mode]);
+
+  useEffect(() => {
+    if (!mediaReady) return;
+    const token = introTokenRef.current;
     let timer: number | undefined;
+    let started = false;
     const start = () => {
-      if (timer != null || document.visibilityState === 'hidden') return;
+      if (started || introTokenRef.current !== token || document.visibilityState === 'hidden') return;
+      started = true;
+      setIntroPhase('playing');
       const duration = isMobile ? MOBILE_INTRO_DURATION_MS : INTRO_DURATION_MS;
-      timer = window.setTimeout(() => setIsIntroHidden(true), duration);
+      timer = window.setTimeout(() => {
+        if (introTokenRef.current === token) setIntroPhase('done');
+      }, duration);
     };
     start();
     const onVisibility = () => {
@@ -289,7 +399,27 @@ export const MenuApp = () => {
       document.removeEventListener('visibilitychange', onVisibility);
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [hasWelcomeGif, isMobile, mode]);
+  }, [mediaReady, isMobile]);
+
+  const onWelcomeLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const token = introTokenRef.current;
+    const image = event.currentTarget;
+    const finish = () => {
+      if (introTokenRef.current !== token) return;
+      if (image.naturalWidth > 0) setMediaReady(true);
+      else if (image.complete) setIntroPhase('done');
+    };
+    if (typeof image.decode === 'function') {
+      image.decode().then(finish).catch(finish);
+      return;
+    }
+    finish();
+  };
+
+  const onWelcomeError = () => {
+    introTokenRef.current += 1;
+    setIntroPhase('done');
+  };
 
   const openSubredditMenu = () => {
     const destination = getSubredditAboutLink(context?.subredditName);
@@ -364,7 +494,13 @@ export const MenuApp = () => {
   );
 
   const welcomeIntro = hasWelcomeGif ? (
-    <section className={`intro ${isIntroHidden ? 'intro--hidden' : ''}`}>
+    <section className={`intro${introPhase === 'done' ? ' intro--hidden' : ''}${introPhase === 'loading' ? ' intro--loading' : ''}`}>
+      {introPhase === 'loading' && (
+        <div className="intro__loader" role="status">
+          <span className="intro__loader-ring" aria-hidden="true" />
+          <span className="visually-hidden">Loading welcome</span>
+        </div>
+      )}
       {blurFrame ? (
         <div className={`intro__frame intro__frame--${blurModifier}`}>
           <img
@@ -377,24 +513,28 @@ export const MenuApp = () => {
           />
           <div className="intro__shade" aria-hidden="true" />
           <img
+            ref={welcomeMediaRef}
             className="intro__media intro__media--contained"
             src={sessionGifSrc}
             alt="Welcome animation"
             loading="eager"
             decoding="sync"
             fetchPriority="high"
-            onError={() => setIsIntroHidden(true)}
+            onLoad={onWelcomeLoad}
+            onError={onWelcomeError}
           />
         </div>
       ) : (
         <img
+          ref={welcomeMediaRef}
           className="intro__media intro__media--wide"
           src={sessionGifSrc}
           alt="Welcome animation"
           loading="eager"
           decoding="sync"
           fetchPriority="high"
-          onError={() => setIsIntroHidden(true)}
+          onLoad={onWelcomeLoad}
+          onError={onWelcomeError}
           style={{
             objectFit: config.introGifFit,
             ...(sessionGifFit === 'canvas'
@@ -408,17 +548,19 @@ export const MenuApp = () => {
           }}
         />
       )}
-      <div className="intro__title" aria-label={subredditTitle}>
-        {Array.from(subredditTitle).map((char, index) => (
-          <span
-            key={`${char}-${index}`}
-            className="intro__title-letter"
-            style={{ animationDelay: `${index * 0.06}s` }}
-          >
-            {char === ' ' ? '\u00A0' : char}
-          </span>
-        ))}
-      </div>
+      {introPhase === 'playing' && (
+        <div className="intro__title" aria-label={subredditTitle}>
+          {Array.from(subredditTitle).map((char, index) => (
+            <span
+              key={`${char}-${index}`}
+              className="intro__title-letter"
+              style={{ animationDelay: `${index * 0.06}s` }}
+            >
+              {char === ' ' ? '\u00A0' : char}
+            </span>
+          ))}
+        </div>
+      )}
     </section>
   ) : null;
 
@@ -426,7 +568,7 @@ export const MenuApp = () => {
     const showPager = pageCount > 1;
     return (
       <AppErrorBoundary>
-        <div className={`app app--inline ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
+        <div className={`app app--inline ${introPhase === 'done' ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
           <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
             <div className="menu__overlay" />
             <div className="menu__content menu__content--inline">
@@ -481,9 +623,7 @@ export const MenuApp = () => {
                       </button>
                     </div>
                   )}
-                  <button type="button" id="builtin-subreddit-menu" className="subreddit-menu" onClick={openSubredditMenu}>
-                    Subreddit Menu
-                  </button>
+                  <SubredditMenuButton onClick={openSubredditMenu} />
                 </div>
               </div>
             </div>
@@ -496,7 +636,7 @@ export const MenuApp = () => {
 
   return (
     <AppErrorBoundary>
-      <div className={`app app--expanded ${isIntroHidden ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
+      <div className={`app app--expanded ${introPhase === 'done' ? 'app--ready' : 'app--intro'} ${configLoaded ? '' : 'app--config-loading'} ${isAndroid ? 'app--android' : ''}`}>
       <section className={`menu menu--${config.backgroundStyle ?? 'petals'}`}>
         <div className="menu__overlay" />
         <div className="menu__content">
@@ -507,9 +647,7 @@ export const MenuApp = () => {
             <p className="menu__eyebrow">{subredditLabel}</p>
             <h1 className="menu__title">Welcome {context?.username ?? 'traveler'}</h1>
           </header>
-          <button type="button" id="builtin-subreddit-menu" className="subreddit-menu" onClick={openSubredditMenu}>
-            Subreddit Menu
-          </button>
+          <SubredditMenuButton onClick={openSubredditMenu} />
 
           <div className="portal-grid" aria-label="Community navigation">
             {portals.map(({ id, ...portal }, index) => (
