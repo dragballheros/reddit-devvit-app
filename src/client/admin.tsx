@@ -5,6 +5,7 @@ import './admin.css';
 import { getDefaultAdminConfig, getSubredditLink, getSubredditNameFromUrl, type AdminConfig, type ManagedButton, type ManagedAsset, type WelcomeGifFit, type BackgroundStyle } from '../shared/subreddit';
 
 type TargetRecord = { subredditName: string; postId: string };
+type ModeratorAccess = { moderators: string[]; delegatedUsers: string[]; revokedUsers?: string[] };
 const api = async <T,>(url: string, options?: RequestInit): Promise<T> => { const response = await fetch(url, options); const body = await response.json(); if (!response.ok) throw new Error(body.error ?? 'Request failed.'); return body as T; };
 const cloneDefault = (): AdminConfig => JSON.parse(JSON.stringify(getDefaultAdminConfig())) as AdminConfig;
 
@@ -45,14 +46,19 @@ export const AdminApp = () => {
   const [accessDenied, setAccessDenied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [newSubreddit, setNewSubreddit] = useState('');
+  const [isOwner, setIsOwner] = useState(false);
+  const [moderators, setModerators] = useState<string[]>([]);
+  const [delegatedUsers, setDelegatedUsers] = useState<string[]>([]);
+  const [selectedDelegate, setSelectedDelegate] = useState('');
+  const [accessBusy, setAccessBusy] = useState(false);
 
   useEffect(() => {
-    api<{ config: AdminConfig; targets: TargetRecord[] }>('/api/admin/config')
-      .then((data) => { setConfig(data.config); setTargets(data.targets ?? []); })
+    api<{ config: AdminConfig; targets: TargetRecord[]; isOwner: boolean; moderators: string[]; delegatedUsers: string[] }>('/api/admin/config')
+      .then((data) => { setConfig(data.config); setTargets(data.targets ?? []); setIsOwner(data.isOwner); setModerators(data.moderators ?? []); setDelegatedUsers(data.delegatedUsers ?? []); })
       .catch((error) => {
         const message = error instanceof Error
           ? error.message
-          : 'Access denied. Only this subreddit’s top moderator can use the dashboard.';
+          : 'Access denied. Only this subreddit’s top moderator or a moderator explicitly granted dashboard access can use it.';
         setAccessDenied(message);
         showToast(message);
       })
@@ -238,20 +244,56 @@ export const AdminApp = () => {
     finally { setSaving(false); }
   };
 
+  const scanModeratorTeam = async () => {
+    setAccessBusy(true);
+    try {
+      const data = await api<ModeratorAccess>('/api/admin/access/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      setModerators(data.moderators ?? []);
+      setDelegatedUsers(data.delegatedUsers ?? []);
+      setSelectedDelegate('');
+      showToast(data.revokedUsers?.length ? `Moderator scan complete. Removed access for ${data.revokedUsers.length} user(s) no longer on the team.` : 'Moderator team scanned. Existing access grants are current.');
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Moderator scan failed.'); }
+    finally { setAccessBusy(false); }
+  };
+
+  const grantModeratorAccess = async () => {
+    if (!selectedDelegate) { showToast('Choose a moderator from the scanned team first.'); return; }
+    setAccessBusy(true);
+    try {
+      const data = await api<ModeratorAccess>('/api/admin/access/grant', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: selectedDelegate }) });
+      setModerators(data.moderators ?? moderators);
+      setDelegatedUsers(data.delegatedUsers ?? []);
+      setSelectedDelegate('');
+      showToast('Dashboard access granted.');
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not grant dashboard access.'); }
+    finally { setAccessBusy(false); }
+  };
+
+  const revokeModeratorAccess = async (username: string) => {
+    setAccessBusy(true);
+    try {
+      const data = await api<ModeratorAccess>('/api/admin/access/revoke', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username }) });
+      setDelegatedUsers(data.delegatedUsers ?? []);
+      showToast(`Dashboard access revoked for u/${username}.`);
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not revoke dashboard access.'); }
+    finally { setAccessBusy(false); }
+  };
+
   const removeButton = (id: string) => setConfig((current) => ({ ...current, buttons: current.buttons.filter((button) => button.id !== id) }));
 
-  if (loading) return <main className="admin"><div className="panel"><h1>Community Navigation Admin</h1><p>Verifying subreddit top-moderator access…</p></div></main>;
+  if (loading) return <main className="admin"><div className="panel"><h1>Community Navigation Admin</h1><p>Verifying dashboard permissions…</p></div></main>;
 
   if (accessDenied) return <main className="admin"><div className="panel">
-    <header className="hero"><div><p className="eyebrow">Access restricted</p><h1>Top moderator access required</h1><p className="muted">Only the top moderator of this subreddit can create or change this dashboard. Being a moderator in another subreddit does not grant access here.</p></div></header>
+    <header className="hero"><div><p className="eyebrow">Access restricted</p><h1>Dashboard access required</h1><p className="muted">Only this subreddit’s top moderator and moderators explicitly granted access can edit this dashboard. Being a moderator in another subreddit does not grant access here.</p></div></header>
     <section className="section"><h2>Dashboard unavailable</h2><p className="validation-error" role="alert">{accessDenied}</p><p className="hint">Access is checked by the server for every admin action. If you are the top moderator, refresh the post and try again.</p></section>
   </div></main>;
 
   return <main className="admin"><div className="panel">
-    <header className="hero"><div><p className="eyebrow">Top Moderator Dashboard</p><h1>Community Navigation Admin</h1><p className="muted">Only this subreddit’s top moderator can configure navigation and apply changes to eligible communities.</p></div><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply'}</button></header>
+    <header className="hero"><div><p className="eyebrow">{isOwner ? 'Top Moderator Dashboard' : 'Delegated Moderator Access'}</p><h1>Community Navigation Admin</h1><p className="muted">{isOwner ? 'Manage this dashboard and grant access to trusted moderators on this subreddit.' : 'The top moderator has granted you access to configure this community’s navigation.'}</p></div><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply'}</button></header>
     <section className="section"><div className="section-title"><h2>Welcome Screen</h2><span>{(config.welcomeGifVariants?.length ?? (config.welcomeGif ? 1 : 0))} GIF{(config.welcomeGifVariants?.length ?? (config.welcomeGif ? 1 : 0)) === 1 ? '' : 's'}</span></div><div className="upload-row"><div className="welcome-gif-grid">{(config.welcomeGifVariants?.length ? config.welcomeGifVariants : config.welcomeGif ? [config.welcomeGif] : []).map((url, index)=><div className="welcome-gif-card" key={url + index}><img src={url} className="preview-gif" alt={`Welcome GIF ${index + 1}`}/><label className="welcome-gif-fit">Display<select value={config.welcomeGifFitByUrl?.[url] ?? 'natural'} onChange={(e)=>setConfig((c)=>({...c,welcomeGifFitByUrl:{...(c.welcomeGifFitByUrl ?? {}),[url]:e.target.value as WelcomeGifFit}}))}><option value="natural">Large / fill height</option><option value="canvas">Fit app canvas</option></select></label><button className="ghost" onClick={()=>setConfig((c)=>{const variants=(c.welcomeGifVariants?.length ? c.welcomeGifVariants : c.welcomeGif ? [c.welcomeGif] : []).filter((_,i)=>i!==index); const fits={...(c.welcomeGifFitByUrl ?? {})}; delete fits[url]; return {...c,welcomeGif:variants[0],welcomeGifVariants:variants,welcomeGifFitByUrl:fits};})}>Remove</button></div>)}{!(config.welcomeGifVariants?.length || config.welcomeGif) && <div className="empty-preview">No welcome GIF configured</div>}</div><div><button className="secondary" onClick={()=>uploadMedia('welcome')}>Add Welcome GIF</button>{(config.welcomeGifVariants?.length || config.welcomeGif)&&<button className="ghost" onClick={()=>setConfig((c)=>({...c,welcomeGif:undefined,welcomeGifVariants:[],welcomeGifFitByUrl:{}}))}>Clear Welcome GIFs</button>}<p className="hint">Add multiple GIFs. A different GIF is selected randomly each time the post loads or refreshes.</p></div></div></section>
     <section className="section"><div className="section-title"><h2>Background</h2><span>Petals or custom media</span></div><label className="background-style-select">Background type<select value={config.backgroundStyle ?? 'petals'} onChange={(e)=>setConfig((c)=>({...c,backgroundStyle:e.target.value as BackgroundStyle}))}><option value="petals">Flower Petals</option><option value="custom">Custom Background</option></select></label>{(config.backgroundStyle ?? 'petals') === 'custom' && <label className="background-style-select">Custom media<select value={config.customBackground ?? ''} onChange={(e)=>setConfig((c)=>({...c,customBackground:e.target.value||undefined,backgroundStyle:e.target.value?'custom':c.backgroundStyle}))}><option value="">Choose an image or GIF...</option>{config.assets.filter((asset)=>asset.type==='image'||asset.type==='gif').map((asset)=><option key={asset.id} value={asset.url}>{asset.name} ({asset.type.toUpperCase()})</option>)}</select></label>}<div className="background-actions"><button className="secondary" onClick={()=>uploadMedia('background')}>Add Custom Background</button>{config.customBackground&&<button className="ghost" onClick={()=>setConfig((c)=>({...c,customBackground:undefined,backgroundStyle:'petals'}))}>Clear Custom Background</button>}</div><p className="hint">Custom Background accepts either an image or an animated GIF. The same single selector controls which mode is active.</p></section>
     <section className="section"><div className="section-title"><h2>Managed Subreddits</h2><span>{config.managedSubreddits.length} selected</span></div><div className="sub-add"><input value={newSubreddit} onChange={(e)=>setNewSubreddit(e.target.value)} onKeyDown={(e)=>e.key==='Enter'&&addSubreddit()} placeholder="Subreddit name, e.g. YourSubreddit"/><button className="secondary" onClick={addSubreddit}>Add</button></div><div className="chips">{config.managedSubreddits.map((name)=><button key={name} className="chip" onClick={()=>setConfig((c)=>({...c,managedSubreddits:c.managedSubreddits.filter((item)=>item!==name)}))}>r/{name} ×</button>)}</div><p className="hint">The app must be installed in each selected subreddit and you must be a moderator there. Save creates missing navigation posts and updates existing managed posts. Each target post follows this source panel’s public configuration; moderators in target subreddits cannot edit this source dashboard. Each target post follows this admin panel's saved configuration; being a moderator in a target subreddit does not grant access to this source admin panel.</p><div className="targets">{targets.map((target)=><div key={target.postId} className="target"><span>r/{target.subredditName}</span><small>{target.postId}</small></div>)}</div></section>
+    {isOwner && <section className="section"><div className="section-title"><h2>Moderator Access</h2><span>{delegatedUsers.length} delegated</span></div><p className="hint">Only you, as this subreddit’s top moderator, can grant or revoke dashboard access. Select users from the live moderator-team scan. The app rechecks moderator membership on admin requests and removes stale grants when a scan detects that a user is no longer a moderator.</p><div className="access-actions"><button className="secondary" onClick={scanModeratorTeam} disabled={accessBusy}>{accessBusy ? 'Checking…' : 'Scan Moderator Team'}</button><select aria-label="Choose moderator to grant access" value={selectedDelegate} onChange={(e)=>setSelectedDelegate(e.target.value)} disabled={accessBusy}><option value="">Choose a current moderator…</option>{moderators.slice(1).filter((name)=>!delegatedUsers.includes(name)).map((name)=><option key={name} value={name}>u/{name}</option>)}</select><button className="primary" onClick={grantModeratorAccess} disabled={accessBusy || !selectedDelegate}>Grant Dashboard Access</button></div><div className="access-list">{delegatedUsers.map((name)=><div className="access-user" key={name}><span>u/{name}</span><button className="danger" onClick={()=>revokeModeratorAccess(name)} disabled={accessBusy}>Revoke</button></div>)}{delegatedUsers.length===0 && <p className="hint">No moderators have delegated access. Scan the team to refresh the list, then choose a moderator to grant access.</p>}</div></section>}
     <section className="section"><div className="section-title"><h2>Asset Library</h2><span>{config.assets.length} reusable assets</span></div><div className="asset-grid">{config.assets.map((asset)=><div className="asset-card" key={asset.id}><img src={asset.url} alt="" /><div className="asset-card__info"><strong>{asset.name}</strong><small>{asset.type}</small></div><button className="danger asset-card__delete" onClick={()=>removeAsset(asset.id)}>Delete</button></div>)}{config.assets.length===0&&<div className="empty-preview">No reusable assets configured</div>}</div><p className="hint">Assets are Reddit-hosted and reusable across buttons and welcome media. Deleting an asset also clears any configuration references to it. Save & Apply to persist the change.</p></section><section className="section"><div className="section-title"><h2>Navigation Buttons</h2><button className="secondary" onClick={addButton}>+ Add Subreddit Button</button></div><p className="hint">A built-in “Community Menu” button is always shown on the public navigation post. Its destination is automatically set to this installed subreddit’s /about/ page and cannot be customized here. Configurable buttons below accept direct Reddit subreddit links only.</p><div className="buttons">{config.buttons.map((button,index)=><article className="button-card" key={button.id}><div className="button-head"><strong>{index+1}. {button.label}</strong><button className="danger" onClick={()=>removeButton(button.id)}>Remove</button></div><div className="fields"><label>Label<input value={button.label} onChange={(e)=>updateButton(button.id,{label:e.target.value})}/></label><label className="wide">Subreddit URL<input value={button.url??''} onChange={(e)=>updateButton(button.id,{url:e.target.value})} placeholder="https://www.reddit.com/r/YourSubreddit/" aria-invalid={Boolean(button.url && !getSubredditNameFromUrl(button.url))}/></label>{!button.url&&<p className="hint wide">Required. Enter a direct Reddit subreddit URL. Posts, profiles, and external links are not accepted.</p>}{Boolean(button.url && !getSubredditNameFromUrl(button.url))&&<p className="hint wide validation-error">Invalid destination. Use a direct https://www.reddit.com/r/SubredditName/ link only.</p>}<label>Accent<input value={button.accent??'#ffffff'} onChange={(e)=>updateButton(button.id,{accent:e.target.value})}/></label><label>Gradient<input value={button.backgroundGradient??''} onChange={(e)=>updateButton(button.id,{backgroundGradient:e.target.value})} placeholder="linear-gradient(...)"/></label></div><div className="media-row"><button className="secondary" onClick={()=>uploadMedia('background',button.id)}>Upload Background</button><button className="secondary" onClick={()=>uploadMedia('icon',button.id)}>Upload Icon</button><label>Existing Background<select value={button.background??''} onChange={(e)=>updateButton(button.id,{background:e.target.value||undefined})}><option value="">None</option>{config.assets.map((asset)=><option key={asset.id} value={asset.url}>{asset.name}</option>)}</select></label><label>Existing Icon<select value={button.icon??''} onChange={(e)=>updateButton(button.id,{icon:e.target.value||undefined})}><option value="">None</option>{config.assets.map((asset)=><option key={asset.id} value={asset.url}>{asset.name}</option>)}</select></label>{button.background&&<img src={button.background} className="thumb" alt=""/>}{button.icon&&<img src={button.icon} className="thumb icon-thumb" alt=""/>}</div><div className="transform"><div className="section-title"><h3>Background Fit</h3><span>Automatic cover + manual override</span></div><div className="fields"><label>Position X<input type="number" min="0" max="100" value={button.backgroundPositionX??50} onChange={(e)=>updateButton(button.id,{backgroundPositionX:Number(e.target.value)})}/></label><label>Position Y<input type="number" min="0" max="100" value={button.backgroundPositionY??50} onChange={(e)=>updateButton(button.id,{backgroundPositionY:Number(e.target.value)})}/></label><label>Scale<input type="number" min="0.5" max="3" step="0.05" value={button.backgroundScale??1} onChange={(e)=>updateButton(button.id,{backgroundScale:Number(e.target.value)})}/></label></div><BackgroundEditor button={button} onChange={(patch) => updateButton(button.id, patch)} /><p className="hint">The button frame stays fixed. X/Y move the image inside it and Scale resizes the background.</p></div></article>)}</div></section>
     <footer className="footer"><button className="primary" onClick={save} disabled={saving}>{saving?'Applying…':'Save & Apply to Existing Posts'}</button><p>The three-dot Create Navigation Post remains separate for review/testing and creates an independent post.</p></footer>
   </div></main>;
