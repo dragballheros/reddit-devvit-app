@@ -5,14 +5,14 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "inline": true,
+        "inline": false,
         "entry": "splash.html",
         "height": "tall"
       },
       "admin": {
         "entry": "admin.html",
         "height": "tall",
-        "inline": true
+        "inline": false
       }
     }
   },
