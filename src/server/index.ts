@@ -113,22 +113,6 @@ const effectiveConfig = (admin?: AdminConfig): AppConfig =>
 const requireModerator = async (subredditName?: string) =>
   Boolean(subredditName && await isCurrentUserModerator(subredditName));
 
-/**
- * Admin actions must run in a real admin-panel post in the current subreddit.
- * Moderator status alone must not turn any public navigation post into an
- * editable admin panel.
- */
-const requireAdminPanelModerator = async (): Promise<boolean> => {
-  const postId = toRedditPostId(context.postId);
-  const subredditName = normalizeManagedSubredditName(context.subredditName);
-  return Boolean(
-    postId &&
-    subredditName &&
-    isAdminPanelPostData(context.postData) &&
-    await requireModerator(subredditName)
-  );
-};
-
 const isCurrentUserModerator = async (subredditName: string): Promise<boolean> => {
   const user =
     context.userId
@@ -141,6 +125,60 @@ const isCurrentUserModerator = async (subredditName: string): Promise<boolean> =
 
   const permissions = await user.getModPermissionsForSubreddit(subredditName);
   return permissions.length > 0;
+};
+
+/**
+ * Reddit does not expose a separate owner role. For this app, the dashboard
+ * owner is the top moderator listed first by Reddit for the current subreddit.
+ * Fail closed if the live moderator list cannot confirm the caller.
+ */
+const isCurrentUserSubredditOwner = async (subredditName: string): Promise<boolean> => {
+  try {
+    const user =
+      context.userId
+        ? await reddit.getUserById(context.userId)
+        : context.username
+          ? await reddit.getUserByUsername(context.username)
+          : undefined;
+    const username = (user?.username ?? context.username)?.trim().toLowerCase();
+    if (!username) return false;
+
+    const subreddit = await reddit.getSubredditByName(subredditName);
+    const moderators = await subreddit.getModerators().get(1);
+    const topModerator = moderators[0]?.username?.trim().toLowerCase();
+    return Boolean(topModerator && topModerator === username);
+  } catch (error) {
+    console.warn('Could not verify subreddit top moderator; denying dashboard access.', error);
+    return false;
+  }
+};
+
+/**
+ * Every admin endpoint is bound to the one canonical admin post recorded in
+ * this installation's Redis, and verifies the persisted post data and owner.
+ * A stale panel, a target navigation post, or a post from another subreddit
+ * cannot be used as an alternate write surface.
+ */
+const requireAdminPanelOwner = async (): Promise<boolean> => {
+  const postId = toRedditPostId(context.postId);
+  const subredditName = normalizeManagedSubredditName(context.subredditName);
+  const canonicalAdminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
+  if (
+    !postId ||
+    !subredditName ||
+    postId !== canonicalAdminPostId ||
+    !isAdminPanelPostData(context.postData) ||
+    !(await isCurrentUserSubredditOwner(subredditName))
+  ) return false;
+
+  try {
+    const post = await reddit.getPostById(postId);
+    if (normalizeSubredditName(post.subredditName) !== normalizeSubredditName(subredditName)) return false;
+    const storedData = await reddit.getPostData(postId);
+    return isAdminPanelPostData(storedData);
+  } catch {
+    return false;
+  }
 };
 
 app.get('/api/runtime-config', async (c) => {
@@ -160,8 +198,8 @@ app.get('/api/runtime-config', async (c) => {
 
 app.get('/api/admin/config', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
     }
     const config = await getAdminConfigFromPost(context.postId) ?? getDefaultAdminConfig();
     return c.json({ config, targets: await getTargetPosts(), adminPostId: context.postId });
@@ -189,8 +227,8 @@ app.get('/api/moderator-status', async (c) => {
 
 app.post('/api/admin/save', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
     }
     const payload = await c.req.json<{ config: AdminConfig }>();
     if (!isValidAdminConfig(payload.config)) return c.json({ error: 'Invalid admin configuration.' }, 400);
@@ -312,8 +350,8 @@ const isUploadId = (value?: string): boolean =>
 
 app.post('/api/admin/upload-asset/chunk', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{
@@ -375,8 +413,8 @@ app.post('/api/admin/upload-asset/chunk', async (c) => {
 
 app.post('/api/admin/upload-asset/finalize', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{ uploadId?: string }>();
@@ -443,8 +481,8 @@ app.post('/api/admin/upload-asset/finalize', async (c) => {
 
 app.post('/api/admin/upload-asset', async (c) => {
   try {
-    if (!(await requireAdminPanelModerator())) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+    if (!(await requireAdminPanelOwner())) {
+      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
     }
 
     const payload = await c.req.json<{ dataUrl?: string; type?: 'image' | 'gif' }>();
@@ -491,7 +529,7 @@ app.post('/api/moderator/create-post', async (c) => {
   try {
     const subredditName = context.subredditName;
     if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
-      return c.json({ error: 'Moderator access required.' }, 403);
+      return c.json({ error: 'Subreddit top-moderator access required.' }, 403);
     }
 
     const adminPostId = toRedditPostId(await redis.get(ADMIN_POST_KEY) ?? undefined);
@@ -529,8 +567,8 @@ app.post('/internal/menu/create-admin', async (c) => {
   try {
     await c.req.json<MenuItemRequest>().catch(() => ({}));
     const { subredditName } = context;
-    if (!subredditName || !(await isCurrentUserModerator(subredditName))) {
-      return c.json<UiResponse>({ showToast: 'Moderator access is required.' });
+    if (!subredditName || !(await isCurrentUserSubredditOwner(subredditName))) {
+      return c.json<UiResponse>({ showToast: 'Only this subreddit’s top moderator can create or replace the admin dashboard.' });
     }
     const existing = await redis.get(ADMIN_POST_KEY);
     if (existing) {
@@ -554,7 +592,7 @@ app.post('/internal/menu/create-admin', async (c) => {
 
     await redis.set(ADMIN_POST_KEY, post.id);
     console.log('Created admin panel custom post ' + post.id + ' in r/' + subredditName);
-    return c.json<UiResponse>({ showToast: 'Admin panel created in the test subreddit.' });
+    return c.json<UiResponse>({ showToast: 'Admin panel created. Only this subreddit’s top moderator can edit it.' });
   } catch (error) {
     console.error('Failed to create admin panel:', error);
     return c.json<UiResponse>({ showToast: 'Failed to create the admin configuration panel.' });
@@ -574,7 +612,7 @@ app.post('/internal/menu/create-post', async (c) => {
       });
     }
     if (!(await isCurrentUserModerator(subredditName))) {
-      return c.json<UiResponse>({ showToast: 'Moderator access is required.' });
+      return c.json<UiResponse>({ showToast: 'Subreddit top-moderator access is required.' });
     }
 
     console.log('Create post menu action received for r/' + subredditName);
