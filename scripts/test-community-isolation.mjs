@@ -409,6 +409,11 @@ assert.doesNotMatch(menuUi, /Open the expanded view to browse linked subreddits/
 assert.doesNotMatch(menuUi, /100vh|100dvh/);
 const menuCss = await readFile(new URL('../src/client/index.css', import.meta.url), 'utf8');
 assert.match(menuCss, /\.app--inline[\s\S]*overflow:\s*hidden/);
+assert.match(menuCss, /\.app--inline \{[^}]*touch-action:\s*auto/);
+assert.match(menuCss, /\.app--inline \{[^}]*overscroll-behavior:\s*auto/);
+assert.doesNotMatch(menuCss, /\.app--inline \{[^}]*touch-action:\s*(?:none|manipulation)/);
+assert.doesNotMatch(menuCss, /\.app--inline \{[^}]*overscroll-behavior:\s*none/);
+assert.doesNotMatch(menuCss, /\.carousel__viewport \{[^}]*touch-action:\s*(?:none|manipulation)/);
 assert.match(menuCss, /transition:\s*transform\s+250ms/);
 assert.match(menuCss, /\.app--expanded \.portal-grid/);
 assert.match(menuCss, /prefers-reduced-motion/);
@@ -442,6 +447,12 @@ assert.doesNotMatch(menuUi, /Play audio|Mute audio|<audio|profile-card|app--prof
 assert.doesNotMatch(menuCss, /profile-card|audio-toggle|app--profile|app--card-glass/);
 const adminCss = await readFile(new URL('../src/client/admin.css', import.meta.url), 'utf8');
 assert.match(adminCss, /\.admin--inline\{[^}]*overflow:\s*hidden/);
+assert.match(adminCss, /\.admin--inline\{[^}]*touch-action:\s*auto/);
+assert.match(adminCss, /\.admin--inline\{[^}]*overscroll-behavior:\s*auto/);
+assert.doesNotMatch(adminCss, /\.admin--inline\{[^}]*touch-action:\s*(?:none|manipulation)/);
+assert.doesNotMatch(adminCss, /\.admin--inline\{[^}]*overscroll-behavior:\s*none/);
+assert.match(server, /media\.upload\(/);
+assert.doesNotMatch(route('/api/admin/upload-asset'), /https?:\/\/(?!data:)/);
 const webViewMode = await readFile(new URL('../src/client/useWebViewMode.ts', import.meta.url), 'utf8');
 const splashHtml = await readFile(new URL('../src/client/splash.html', import.meta.url), 'utf8');
 assert.match(webViewMode, /if \(!host\.devvit\) return 'inline'/);

@@ -620,7 +620,7 @@ export const AdminApp = () => {
             <div>
               <p className="eyebrow">Moderator Configuration</p>
               <h1>Community Navigation Admin</h1>
-              <p className="hint">Opens the expanded editor. Requires Everything in this subreddit, or an explicit grant.</p>
+              <p className="hint">Opens the expanded editor. Requires Everything here, or an explicit grant.</p>
             </div>
           </header>
           <section className="section">

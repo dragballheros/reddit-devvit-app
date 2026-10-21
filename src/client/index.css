@@ -12,14 +12,19 @@
 
 html, body, #root {
   width: 100%;
-  min-height: 100%;
   height: 100%;
+  max-height: 100%;
   margin: 0;
+  overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
   background: #000;
 }
 
 body {
   overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: rgba(248, 246, 255, 0.96);
 }
@@ -29,9 +34,11 @@ button { font: inherit; }
 .app {
   position: relative;
   width: 100%;
-  min-height: 100%;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
   background: #000;
 }
 
@@ -606,7 +613,7 @@ button { font: inherit; }
   max-height: 100%;
 }
 
-.intro__media--wide { width: max-content; }
+.intro__media--wide { width: auto; max-width: 100%; }
 
 .intro__title {
   position: absolute;
@@ -875,8 +882,8 @@ button { font: inherit; }
 
 .app--inline {
   overflow: hidden;
-  touch-action: manipulation;
-  overscroll-behavior: none;
+  touch-action: auto;
+  overscroll-behavior: auto;
 }
 
 .app--inline .menu,
@@ -907,6 +914,40 @@ button { font: inherit; }
   text-overflow: ellipsis;
 }
 
+.app--inline .carousel__controls,
+.app--inline .subreddit-menu {
+  min-height: 0;
+}
+
+.app--inline .intro,
+.app--inline .intro__frame,
+.app--inline .intro__loader {
+  touch-action: auto;
+  overscroll-behavior: auto;
+}
+
+@media (max-height: 360px) {
+  .menu__content--inline {
+    padding: 8px 10px 6px;
+    gap: 4px;
+  }
+
+  .app--inline .menu__eyebrow { margin: 0; font-size: 0.62rem; }
+
+  .app--inline .menu__title { font-size: 1rem; }
+
+  .app--inline .carousel,
+  .app--inline .carousel__page { gap: 4px; }
+
+  .app--inline .carousel__controls { gap: 6px; }
+
+  .app--inline .carousel__arrow { width: 34px; height: 34px; }
+
+  .app--inline .subreddit-menu { min-height: 36px; }
+
+  .app--inline .portal-button__icon-shell { max-height: 40px; margin-left: 6px; margin-right: 6px; }
+}
+
 .carousel {
   position: relative;
   z-index: 2;
@@ -922,7 +963,8 @@ button { font: inherit; }
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  touch-action: manipulation;
+  touch-action: auto;
+  overscroll-behavior: auto;
 }
 
 .carousel__track {
@@ -1136,6 +1178,41 @@ button { font: inherit; }
 
 .app--expanded .subreddit-menu__label {
   font-size: 0.95rem;
+}
+
+.app-error {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #070014, #101447 45%, #071d32);
+  color: white;
+  font-family: system-ui, sans-serif;
+}
+
+.app-error__card {
+  max-width: 620px;
+  max-height: 100%;
+  overflow: hidden;
+  width: 100%;
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.app-error h1 { margin: 0; font-size: 1.25rem; }
+
+.app-error p { margin: 8px 0 0; color: rgba(255, 255, 255, 0.75); line-height: 1.4; }
+
+.app-error__detail {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  word-break: break-word;
 }
 
 .visually-hidden {

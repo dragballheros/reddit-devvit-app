@@ -35,11 +35,11 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
   render() {
     if (this.state.error) {
       return (
-        <div style={{ minHeight: 180, display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg, #070014, #101447 45%, #071d32)', color: 'white', fontFamily: 'system-ui, sans-serif' }}>
-          <div style={{ maxWidth: 620, width: '100%', padding: 24, borderRadius: 24, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(0,0,0,.55)', boxShadow: '0 20px 60px rgba(0,0,0,.45)' }}>
-            <h1 style={{ margin: 0, fontSize: 24 }}>Community Navigation</h1>
-            <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,.75)', lineHeight: 1.5 }}>The navigation interface encountered a rendering error.</p>
-            <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,.5)', fontSize: 12, wordBreak: 'break-word' }}>{this.state.error.message}</p>
+        <div className="app-error">
+          <div className="app-error__card">
+            <h1>Community Navigation</h1>
+            <p>The navigation interface encountered a rendering error.</p>
+            <p className="app-error__detail">{this.state.error.message}</p>
           </div>
         </div>
       );

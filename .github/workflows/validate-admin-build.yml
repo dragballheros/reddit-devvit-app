@@ -17,3 +17,7 @@ jobs:
       - run: npm run test:community-isolation
       - run: npm run type-check
       - run: npm run build
+      - uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+      - run: npm run test:inline-scroll
