@@ -5,14 +5,12 @@
     "dir": "dist/client",
     "entrypoints": {
       "default": {
-        "inline": true,
         "entry": "splash.html",
         "height": "tall"
       },
       "admin": {
         "entry": "admin.html",
-        "height": "tall",
-        "inline": true
+        "height": "regular"
       }
     }
   },
@@ -24,14 +22,14 @@
     "items": [
       {
         "label": "Create Navigation Post",
-        "description": "Create a new community navigation post for testing and review.",
+        "description": "Create a community navigation post from the saved admin configuration.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-post"
       },
       {
         "label": "Create Navigation Admin Panel",
-        "description": "Create the moderator configuration post in the current test subreddit.",
+        "description": "Create or replace this subreddit's admin panel. Requires the Everything moderator permission; delegated access is cleared.",
         "location": "post",
         "forUserType": "moderator",
         "postFilter": "currentApp",
@@ -53,5 +51,8 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build"
+  },
+  "dev": {
+    "subreddit": "communitypro_dev"
   }
 }

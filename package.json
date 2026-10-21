@@ -10,7 +10,8 @@
     "launch": "npm run deploy && devvit publish",
     "login": "devvit login",
     "type-check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json",
-    "test:community-isolation": "node --experimental-strip-types scripts/test-community-isolation.mjs"
+    "test:community-isolation": "node --experimental-strip-types scripts/test-community-isolation.mjs",
+    "test:inline-scroll": "node scripts/test-inline-scroll.mjs"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -31,5 +32,9 @@
     "typescript": "6.0.3",
     "vite": "8.3.1",
     "@types/node": "24.13.3"
+  },
+  "allowScripts": {
+    "esbuild@0.25.9": true,
+    "protobufjs@7.6.3": true
   }
 }

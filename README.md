@@ -1,147 +1,135 @@
 # Community Navigation for Reddit
 
-Community Navigation is a reusable Reddit Devvit custom post intended to help members find and navigate between subreddits. Each participating community's top moderator owns that community's navigation dashboard and controls who else may edit it. The top moderator can explicitly grant dashboard access to selected members of that same subreddit’s current moderator team. Ordinary members and moderators without a grant cannot change the dashboard, and being a moderator in another subreddit does not grant access.
+Community Navigation is a Reddit Devvit custom post that helps members move between Safe for Work subreddits. A moderator with Reddit’s **Everything** permission owns that community’s admin dashboard and can explicitly grant edit access to other current moderators. Ordinary members, and moderators without Everything or an explicit grant, cannot change the dashboard. Moderating a different subreddit does not grant access.
 
-**This app is for Safe for Work (SFW) use only. NSFW content and destinations are not allowed.** The app and its configuration must comply with the current Devvit Rules and all other applicable Reddit policies.
+**This app is for Safe for Work (SFW) use only. NSFW content and destinations are not allowed.** Installations and configurations must follow the current [Devvit Rules](https://developers.reddit.com/docs/devvit_rules) and all other applicable Reddit policies.
 
-## What the app provides
+## What members see
 
-- A **Community Navigation Admin** panel owned by the current subreddit’s top moderator, with optional delegated access for specifically approved moderators.
-- A configurable navigation page for subreddit destinations.
-- A built-in **Subreddit Menu** button that automatically opens the installed subreddit’s `/about/` page.
-- Customizable button labels and appearance, including colors, gradients, icons, and backgrounds.
-- Optional welcome GIFs and a reusable asset library for uploaded images.
-- Placeholder buttons (**Subreddit 1** through **Subreddit 4**) when no destinations have been configured.
-- A top-moderator-only action for creating or recreating the configuration panel.
-- Live moderator-team scanning and top-moderator-controlled grants/revocations for delegated dashboard access.
-- Managed subreddit support, allowing the source dashboard’s top moderator or a delegated editor to create or update navigation posts only in target subreddits where the acting user also has moderator permissions and the app is installed.
+The public post stays an inline card in the feed. In Devvit 0.14.7 the `inline` flag in `devvit.json` is ignored, and every post entrypoint starts inline. The card uses the tall inline height and shows the menu itself. It does not scroll: there is no overflow scrolling, no wheel or touch-drag scrolling, and no swipe between pages. Members move with buttons only.
 
-The app is community-configured. A fresh installation has no community-specific destinations or media. Uploaded media uses Reddit/Devvit's media pipeline.
+Inline, the card shows:
 
-## Intended use and community control
+- As many configured subreddit buttons as fit on one page (four per page). When welcome media is saved, the card waits until that image has loaded and decoded, shows a small loading mark until then, plays the intro, and only then shows the buttons. If the file fails or takes longer than a few seconds, the buttons appear so the card never stays blank. The card still does not scroll.
+- **Previous** and **Next** chevrons when more than one page is needed. Tapping one slides the next set of buttons in. **Previous** is hidden on the first page, **Next** is hidden on the last page, and both are hidden when every button fits on one page. A page indicator such as `1 / 3` appears only when there is more than one page.
+- **Subreddit Menu**, a gold text button with no icon, in the control row. A sheen crosses the metal face and a gold edge travels around the border. With reduced motion it stays a still gold button. It opens this subreddit’s About page.
 
-Community Navigation is a general-purpose subreddit navigation utility, not an endorsement of any particular community or an advertising tool for external platforms.
+The expanded view can scroll. It uses the same welcome wait, intro, and gold **Subreddit Menu** button, then shows every subreddit button. If several welcome files are saved, one is chosen at random on each load. Welcome media defaults to **Blurred fill**: the file stays sharp and fully visible in the center, and a second copy of the same file is scaled to cover the frame, blurred, and slightly darkened behind it. That fills whichever bars the sharp image leaves. **Side blur** locks a portrait file to the frame height so the blurred copy fills the left and right. **Top/bottom blur** locks a widescreen file to the frame width so the blurred copy fills the bars above and below. A new upload is set to **Side blur** when the file is taller than it is wide, and to **Top/bottom blur** when it is wider than it is tall. Nearly square files, and files whose size cannot be read, stay on **Blurred fill**. **Large / fill height** and **Fit app canvas** are the other **Display** choices. The blur is one background layer. Reduced motion keeps that still fill and skips the decorative title motion.
 
-- Subreddit moderators are responsible for choosing and maintaining the destinations and media configured for their community.
-- Only use the app to direct members to relevant **SFW subreddits**.
-- Do not configure NSFW subreddits or destinations, sexually explicit or otherwise mature content, or media that violates Reddit's rules.
-- Do not use the app to promote Discord servers, other external apps, or off-platform services. If legacy destination controls are present in the current interface, do not use them; the intended use is subreddit-to-subreddit navigation only.
-- The app must not be used to evade Reddit's rules, subreddit restrictions, age-gating requirements, or other safety mechanisms.
+Every public button can use an **Electric**, **Glow**, or **None** outline. Electric is the default: a bright segment in that button’s accent color travels around the border. Glow is a steady accent ring. None is a plain light ring. With reduced motion, Electric becomes a steady glow and the page change is instant.
 
-A moderator's ability to configure a community does not exempt that configuration or the app from Reddit's policies. All moderators and users must use the app in accordance with the Devvit Rules and all applicable Reddit Terms & Policies.
+Button names use the moderator’s **Small**, **Medium**, or **Large** size, scaled up so they sit beside the larger icons. Each name has a soft glow in that button’s accent. A name that does not fit slides slowly until its end is visible, fades out, and returns to the start. The slide uses movement and opacity only, so the inline card still does not scroll. With reduced motion the name stays still and ends in an ellipsis.
 
-Read the current [Devvit Rules](https://developers.reddit.com/docs/devvit_rules) before installing, configuring, or using the app. Reddit may update its policies and may reject, restrict, or remove apps or content that do not comply.
+- **Subreddit Menu** always opens `https://www.reddit.com/r/{currentSubreddit}/about/` for the subreddit where that post is running. Moderators do not edit this URL.
+- Configured buttons keep their labels, colors, gradients, icons, and backgrounds.
+- Four disabled placeholders (**Subreddit 1** through **Subreddit 4**) appear when no destinations are configured yet. **Subreddit Menu** stays active and does not take one of those four slots.
+- A petal background, or a custom Reddit-hosted image or GIF, sits behind the buttons.
 
-## How moderators use the app
+## What moderators can configure
 
-### 1. Create the admin panel
+The **Community Navigation Admin** panel is a separate custom post. Inline, it is a fixed launcher with **Open admin editor** and does not scroll. The form scrolls only after that control opens the expanded editor.
 
-Install or playtest the app in a subreddit where you are the top moderator.
+- Welcome images and GIFs, including how each one is fitted. **Blurred fill** is the default. **Side blur**, **Top/bottom blur**, **Large / fill height**, and **Fit app canvas** are the other choices. A portrait upload starts on **Side blur**, and a widescreen upload starts on **Top/bottom blur**.
+- Petal or custom backgrounds.
+- Subreddit buttons: label, destination, accent, outline (**Electric**, **Glow**, or **None**), label color, font, size, weight, gradient, icon, background, and background position/scale. A button can be disabled without deleting it. Omitting the outline keeps **Electric**.
+- An asset library of Reddit-hosted images and GIFs. Deleting an asset clears references to it.
+- Several subreddits from one admin post. Each connected subreddit has its own buttons, welcome media, backgrounds, and label styles. This community keeps its own configuration too.
 
-From the app's custom-post menu, the subreddit’s **top moderator** chooses **Create Navigation Admin Panel**. The app creates a configuration post in the current subreddit. Running the action again attempts to remove the previous admin post and creates a fresh one. Recreating the panel invalidates previous delegated grants.
+Destination checks run in the editor and again on the server. Only HTTPS URLs on `reddit.com`, `www.reddit.com`, or `old.reddit.com` with a direct `/r/SubredditName/` path are accepted. Posts, profiles, other websites, query strings, fragments, and custom ports are rejected. Saved links are rewritten to `https://www.reddit.com/r/{name}/`.
 
-The admin panel is accessed from the app's own custom-post menu. Only the top moderator can create or replace the panel and manage delegated access. The top moderator and moderators explicitly granted access can read and change the dashboard. The server verifies the canonical admin post and checks authorization on every admin request. Reddit profile pinning is not performed automatically.
+Discord, Modmail, and other external button types are not supported. Older saved buttons of those types are dropped and are not shown.
 
-Each subreddit installation has its own Redis-backed configuration, canonical admin panel, and delegated-access list. A panel in one subreddit does not grant administrative access to another community's panel. If an authorized dashboard editor selects a managed subreddit, the app creates or updates only its own navigation post there, after checking that the acting user is a moderator in that target community and that the app has the required installation/permissions. The target navigation post follows the source panel's saved public configuration; moderators of the target community do not gain edit access to the source admin panel.
+Uploaded media must be PNG, JPEG, WEBP, or GIF, at most 20 MB, and must come back on a Reddit media host. The server rejects other image URLs. Devvit’s upload also times out after 30 seconds, so files near 10 MB can fail on a slow connection. MP4 and WebM are not accepted. A moving background has to be a GIF under 20 MB. Animated WEBP may be saved as a still JPEG.
 
-### 1A. Grant dashboard access to other moderators
+## Access control
 
-Only the current subreddit’s top moderator can manage delegated access.
+Reddit’s moderator permission named `all` is the **Everything** permission. This app uses that permission everywhere it previously required the first moderator in the list. If Reddit cannot return the acting user’s permissions, the action is denied.
 
-1. Open the canonical **Community Navigation Admin** panel.
-2. In **Moderator Access**, choose **Scan Mod Team** to load the live moderator roster from Reddit.
-3. Find the moderator who needs access and choose **Grant Access** next to their username.
-4. To remove access, choose **Revoke Access** next to that username.
+| Action | Who can do it |
+| --- | --- |
+| Create or replace the admin panel | A current moderator with Everything in this subreddit |
+| Grant or revoke dashboard access | A moderator with Everything, from the canonical admin panel |
+| Edit and publish this community’s configuration | A moderator with Everything, or a current moderator with an explicit grant |
+| Create a navigation post in this subreddit | Any current moderator |
+| Connect, edit, paste, or publish another subreddit | Someone who can open this panel and has Everything in that subreddit, with the app installed there |
 
-Grants apply only to this subreddit’s admin dashboard. A delegated moderator can edit the dashboard and its assets, but cannot grant or revoke access or create/replace the admin panel. A moderator in a target subreddit does not gain access to the source dashboard simply by being a moderator there.
+More than one moderator can have Everything. They are peers. Grants are a shared list for this installation, not the property of one moderator. Any moderator with Everything can grant or revoke. A grant stays valid only while that account is still a moderator and does not have Everything. Accounts with Everything are not stored as delegates, because they already have access. If an Everything moderator loses that permission, they lose the dashboard unless another Everything moderator grants them access. Older grants that were stored under a single top-moderator name are still read as the same delegate list.
 
-**Automatic loss of access:** Every admin request checks the user's current moderator status against Reddit. If a delegated user is removed from the moderator team, access is denied immediately even if the stored grant has not yet been cleaned up. **Scan Mod Team** refreshes the roster and removes grants for accounts that are no longer moderators. Grants are tied to the top moderator who issued them; if the top moderator changes, the old grants are invalidated and the new top moderator must approve delegates again. If Reddit cannot confirm current permissions, the app fails closed.
+- A delegated moderator can edit, copy, and paste this community’s configuration. They cannot grant access, revoke access, or replace the panel.
+- A delegated moderator can connect, view, edit, or paste another subreddit only when they have Everything there. Otherwise that configuration stays hidden. The check fails closed when Reddit cannot confirm permissions.
+- A moderator with Everything in this community can view every connected configuration, which lets them copy it. They can connect, paste, or publish a subreddit only when they also have Everything there.
+- Every admin request checks the delegate’s current moderator permissions. Removal from the moderator team denies access immediately, even before the stored grant is cleaned up.
+- **Scan Mod Team** reloads the live roster. Moderators with Everything are labeled **Everything**. **Grant Access** and **Revoke Access** apply only to moderators without Everything. Grants for accounts that left the team are deleted.
+- **Create Navigation Admin Panel** removes the previous panel, creates a blank one, and clears delegated access. It does not copy the previous buttons, media, or grants. Before the old panel is removed, connected navigation posts are given their own copy when the acting user has Everything in that subreddit. Use it to replace a panel, not to refresh one.
+- **Disconnect** removes a subreddit from this panel and keeps its navigation post. If that post still follows this community, disconnect is refused unless the acting user has Everything there, so the post is not left on a shared link. Connecting the same name again reuses the remembered post.
 
-### 2. Configure the welcome screen
+Redis is stored separately for every subreddit installation, including after an app upgrade. There is no app-wide Redis, settings store, or scheduler that two communities share. The admin panel does not read or write the other community’s Redis.
 
-In **Welcome Screen**:
+**Connected Subreddits** discovers installations through Reddit. On install, Devvit makes the app account a moderator of that community. The server asks Reddit for the communities that account moderates, then keeps only the ones where the signed-in moderator has Everything at that moment. A permission check that fails is left off the list. There is no name field. The first 40 other installations are checked per request.
 
-- Add one or more SFW welcome GIFs or images.
-- Multiple GIFs may be selected randomly when the post loads or refreshes.
-- Remove all welcome media to skip the intro and go directly to the navigation buttons.
+Choosing **Connect Subreddit** writes this community’s saved configuration onto a navigation post in the target community. Reddit posts are readable from any installation, so this panel creates or updates that post and reads it back later. The post is the target’s copy of the configuration. This installation only remembers the post id. The target’s Redis is left alone, and its public menu reads the post. If this installation’s Redis no longer has the post id, the panel looks for the existing app navigation post in the target before creating another one. A post that already stores its own configuration is reused rather than overwritten.
 
-All uploaded media must be SFW and comply with Reddit's policies.
+A community the actor cannot change is labeled **r/{name} (Everything only)**.
 
-### 3. Configure subreddit navigation
+Each subreddit installation still has its own Redis data, canonical admin post, and grant list. An admin panel in one community cannot edit another community’s panel.
 
-Use **+ Add Subreddit Button** to configure a destination. Each configurable button must point directly to a subreddit landing page on Reddit, such as `https://www.reddit.com/r/ExampleSubreddit/`.
+## Install and playtest
 
-**Destination validation is enforced in both the admin interface and the server.** Only HTTPS URLs on `reddit.com`, `www.reddit.com`, or `old.reddit.com` with a direct `/r/SubredditName/` path are accepted. Links to other websites, Reddit posts, user profiles, and URLs with query parameters or fragments are rejected. Saved links are normalized to a canonical Reddit subreddit URL. Do not configure NSFW destinations or use misleading labels.
+Requirements:
 
-Discord, Modmail, and arbitrary external-link button types are not supported. Legacy saved buttons of those types are ignored and are not displayed.
+- Node.js 24 or newer
+- A Reddit account that can moderate the playtest subreddit
+- This repository’s dependencies, including the Devvit CLI
 
-### Built-in Subreddit Menu button
+```bash
+npm install
+npm run login
+npm run dev
+```
 
-Every public navigation post includes a fixed **Subreddit Menu** button. Its destination is generated automatically from the subreddit where that post is running:
+`npm run login` runs `devvit login`. `npm run dev` runs `devvit playtest`.
 
-`https://www.reddit.com/r/{currentSubreddit}/about/`
+`devvit.json` sets the default playtest subreddit to `communitypro_dev`. Override it for one session with `DEVVIT_SUBREDDIT`, or change `dev.subreddit`. The account that playtests must moderate that community. A moderator with Everything creates the admin panel from the post menu. The public entrypoint uses height `tall`, the largest named inline size. The admin entrypoint stays `regular` because its inline view is only the launcher. Expanded mode ignores those heights.
 
-For example, a post running in `r/ExampleCommunity` opens `https://www.reddit.com/r/ExampleCommunity/about/`. The subreddit name is obtained from Devvit's current subreddit context; moderators do not enter or edit this URL, and it is not stored as a configurable button.
+Playtest, upload, and publish need an interactive Reddit login. They are not run by the repository’s automated checks.
 
-The destination opens the community's About/community-information page. Reddit may expose community bookmarks and other resources there, but this URL does not guarantee that the Community Bookmarks section will be selected automatically.
+Other commands:
 
-### 4. Manage reusable assets
+```bash
+npm run test:community-isolation
+npm run type-check
+npm run build
+npm run deploy   # build, then devvit upload
+npm run launch   # deploy, then devvit publish
+```
 
-The **Asset Library** stores reusable images and GIFs uploaded through Reddit/Devvit.
+GitHub Actions runs the isolation tests, TypeScript check, and production build on pushes and pull requests to `main`.
 
-Use the upload controls to add SFW welcome media, button backgrounds, or icons. Existing assets can be selected again from the relevant controls.
+## Moderator setup
 
-Use **Delete** in the Asset Library to remove an asset from the app configuration. Deleting an asset also clears button references to it. Changes are persisted with **Save & Apply**.
+1. Install or playtest the app in a subreddit where you have the Everything moderator permission.
+2. Open one of the app’s posts and choose **Create Navigation Admin Panel**.
+3. Choose **Open admin editor**.
+4. In **Moderator Access**, choose **Scan Mod Team**, then **Grant Access** beside a current moderator. **Revoke Access** removes that grant.
+5. Add SFW welcome media if you want an intro.
+6. Add subreddit buttons with direct Reddit subreddit URLs.
+7. Under **Connected Subreddits**, use **Editing** to choose `r/{this community} (this community)` or another connected subreddit. Each one has its own configuration.
+8. Under **Connected Subreddits**, other installations where you have Everything appear automatically. Choose **Connect Subreddit** beside one of them. The app must already be installed there. That community’s navigation post starts from this community’s saved configuration, so save unsaved work first. If the list fails to load, choose **Refresh list**. A failed check does not offer a name field.
+9. Choose **Copy Config** on the community you want to copy. Select the other community under **Editing**, choose **Paste Config**, then **Replace Config**. Cancel leaves the target unchanged. Pasted configurations are checked again on the server.
+10. Choose **Save & Apply to r/{name}** to publish only the community selected under **Editing**.
+11. Use **Create Navigation Post** when you want another navigation post in the current subreddit for review. That local post keeps following this community’s configuration.
 
-### 5. Apply the configuration
+A navigation post created before this per-subreddit storage keeps showing the configuration it shows today. The first time someone who can open this panel, and who has Everything in that subreddit, loads the dashboard, that configuration is stored on the navigation post itself. Later edits to this community do not change it. If that permission cannot be confirmed, the post stays linked to this community. Saving this community can still change a post that has not been given its own copy.
 
-Click **Save & Apply**.
+Confirm an ungranted moderator is denied, a removed moderator loses access immediately, a moderator who loses Everything loses owner access, and external or non-subreddit URLs are rejected. In the feed, confirm the public post shows the subreddit buttons and **Subreddit Menu**. Wheel and swipe gestures over the inline card move the Reddit feed. **Previous** and **Next** are the only way to change pages. The admin card in the feed is only the **Open admin editor** button, which opens the expanded editor. Check the expanded post on web and mobile, and confirm every destination and image complies with Reddit’s current rules. Images and GIFs are accepted only after Devvit’s media upload, and a stored URL has to be on a Reddit media host.
 
-The app stores the configuration in the admin post and creates or updates managed navigation posts for the selected subreddits. Each target subreddit must have the app installed, and the acting dashboard editor must also have moderator permissions there. Configure only SFW subreddit destinations.
+## Compliance
 
-### 6. Create a standalone test post
+Moderators choose the destinations and media for their community. That choice does not exempt the configuration from Reddit’s policies.
 
-The moderator **Create Navigation Post** action creates a Community Navigation post for testing or review using the saved administrator configuration. The configuration post remains separate.
+- Link only to relevant SFW subreddits.
+- Do not configure NSFW communities, sexually explicit or otherwise mature media, or misleading labels.
+- Do not use the app to promote Discord, other external apps, or off-platform services.
+- Do not use the app to evade subreddit restrictions, age gates, or other Reddit safety systems.
 
-## Configuration behavior
-
-The app is intended to be reusable across SFW communities. A fresh installation has no community-specific destinations or media configured.
-
-When there are no configured subreddit destinations, the app still shows the fixed **Subreddit Menu** button, followed by four disabled placeholders:
-
-- **Subreddit 1**
-- **Subreddit 2**
-- **Subreddit 3**
-- **Subreddit 4**
-
-These placeholders help moderators recognize where to configure subreddit destinations.
-
-## Compliance requirements
-
-By installing, configuring, or using Community Navigation, moderators and users are expected to follow the current Devvit Rules and all applicable Reddit Terms & Policies.
-
-**NSFW use is not permitted.** Do not add, display, link to, or promote NSFW subreddits, adult or sexually explicit content, mature media, or destinations intended for NSFW content. Do not use the app to facilitate policy violations or to bypass Reddit's safety systems.
-
-Moderators are responsible for the destinations and media they configure. The app's general-purpose design does not guarantee that a particular configuration complies with Reddit policy, and this README does not replace the official rules. Check the official Devvit Rules regularly because they may change.
-
-## Basic testing checklist
-
-Before using the app in a community:
-
-1. Create the admin panel as the subreddit’s top moderator.
-2. Scan the moderator team and grant access to a current moderator.
-3. Confirm an ordinary moderator without a grant is denied dashboard access.
-4. Remove a delegated user from the moderator team and confirm access is denied immediately.
-5. Scan the moderator team and confirm the stale grant is removed.
-6. Confirm a top-moderator change invalidates previous grants.
-7. Configure only SFW subreddit destinations.
-8. Add and remove SFW welcome media.
-9. Add, edit, and remove subreddit buttons using valid direct Reddit subreddit URLs.
-10. Confirm an external URL, Reddit post URL, or profile URL is rejected by validation.
-11. Confirm the fixed Subreddit Menu button opens the current subreddit’s `/about/` page and cannot be customized.
-12. Upload and delete an asset, confirming references are cleared.
-13. Save and apply the configuration.
-14. Create a standalone test navigation post.
-15. Refresh the navigation post and confirm the saved configuration persists.
-16. Test mobile and web layouts.
-17. Confirm all displayed destinations and media comply with the current Devvit Rules and Reddit policies.
+Read the current Devvit Rules before installing or configuring the app. Reddit may update its policies and may reject, restrict, or remove apps or content that do not comply.

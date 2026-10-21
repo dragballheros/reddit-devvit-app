@@ -12,14 +12,19 @@
 
 html, body, #root {
   width: 100%;
-  min-height: 100%;
   height: 100%;
+  max-height: 100%;
   margin: 0;
+  overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
   background: #000;
 }
 
 body {
   overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: rgba(248, 246, 255, 0.96);
 }
@@ -29,9 +34,11 @@ button { font: inherit; }
 .app {
   position: relative;
   width: 100%;
-  min-height: 100%;
   height: 100%;
+  max-height: 100%;
   overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
   background: #000;
 }
 
@@ -255,16 +262,19 @@ button { font: inherit; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   padding: 10px 8px 14px;
-  scrollbar-width: none;
-  overscroll-behavior-y: contain;
-  overscroll-behavior-x: none;
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
   background: rgba(0, 0, 0, 0.12);
   border-radius: 24px;
+}
+
+.app--expanded .portal-grid {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  overscroll-behavior: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .portal-grid::-webkit-scrollbar { display: none; }
@@ -289,51 +299,70 @@ button { font: inherit; }
   text-align: left;
   box-shadow:
     0 12px 28px rgba(0,0,0,0.42),
-    0 0 20px color-mix(in srgb, var(--portal-accent) 13%, transparent),
     inset 0 0 24px rgba(255,255,255,0.05);
   transform: translateZ(0);
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition: transform 180ms ease;
 }
 
-.portal-button::before {
-  content: "";
+.portal-button::before,
+.portal-button::after {
+  content: none;
+}
+
+.portal-button__outline {
   position: absolute;
   inset: 0;
-  z-index: 5;
-  pointer-events: none;
+  z-index: 2;
   border-radius: inherit;
-  border: 2px solid color-mix(in srgb, var(--portal-accent) 72%, white 8%);
-  box-shadow:
-    0 0 10px color-mix(in srgb, var(--portal-accent) 34%, transparent),
-    inset 0 0 16px color-mix(in srgb, var(--portal-accent) 10%, transparent);
-  opacity: 0.82;
-  animation: portal-outline 3.8s ease-in-out infinite alternate;
-  animation-delay: calc(var(--portal-index) * -0.22s);
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.portal-button::after {
-  content: "";
+.portal-button--electric .portal-button__outline-spin {
   position: absolute;
-  inset: 2px;
-  z-index: 4;
-  pointer-events: none;
-  border-radius: calc(var(--portal-radius) - 2px);
-  background: radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--portal-accent) 10%, transparent), transparent 34%);
-  opacity: 0.38;
-  animation: portal-tint 4.8s ease-in-out infinite alternate;
-  animation-delay: calc(var(--portal-index) * -0.31s);
+  left: 50%;
+  top: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  transform: translate3d(-50%, -50%, 0);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 250deg,
+    color-mix(in srgb, var(--portal-accent) 55%, transparent) 292deg,
+    var(--portal-accent) 322deg,
+    #ffffff 338deg,
+    var(--portal-accent) 352deg,
+    transparent 360deg
+  );
+  animation: electric-spin 2.6s linear infinite;
+  animation-delay: calc(var(--portal-index) * -0.35s);
+}
+
+.portal-button--glow .portal-button__outline {
+  background: color-mix(in srgb, var(--portal-accent) 88%, white);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--portal-accent) 42%, transparent);
+}
+
+.portal-button--none .portal-button__outline {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.portal-button--electric:focus-visible .portal-button__outline,
+.portal-button--electric:active .portal-button__outline {
+  animation: electric-flicker 180ms linear 1;
 }
 
 .portal-button__background {
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  inset: 2px;
+  z-index: 3;
+  border-radius: calc(var(--portal-radius) - 2px);
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  transform: scale(1.02);
+  transform: scale(1);
   transform-origin: center;
-  filter: saturate(1.05) contrast(1.04);
 }
 
 .portal-button--image {
@@ -354,8 +383,9 @@ button { font: inherit; }
 
 .portal-button__vignette {
   position: absolute;
-  inset: 0;
-  z-index: 1;
+  inset: 2px;
+  z-index: 4;
+  border-radius: calc(var(--portal-radius) - 2px);
   background:
     linear-gradient(90deg, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.46) 20%, rgba(0,0,0,0.12) 52%, rgba(0,0,0,0.58) 100%),
     radial-gradient(circle at 16% 50%, color-mix(in srgb, var(--portal-accent) 22%, transparent), transparent 30%);
@@ -364,9 +394,9 @@ button { font: inherit; }
 .portal-button__icon-shell {
   position: relative;
   z-index: 6;
-  flex: 0 0 clamp(52px, 7.4vw, 78px);
-  width: clamp(52px, 7.4vw, 78px);
-  height: clamp(52px, 7.4vw, 78px);
+  flex: 0 0 clamp(68px, 10vw, 96px);
+  width: clamp(68px, 10vw, 96px);
+  height: clamp(68px, 10vw, 96px);
   margin: 0 clamp(14px, 2vw, 24px);
   display: grid;
   place-items: center;
@@ -410,17 +440,48 @@ button { font: inherit; }
   display: block;
   min-width: 0;
   overflow: hidden;
-  color: rgba(255,255,255,0.97);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.1;
-  text-overflow: ellipsis;
+  font-family: var(--portal-label-font, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-size: var(--portal-label-size, 1.55rem);
+  font-weight: var(--portal-label-weight, 800);
+  letter-spacing: 0.04em;
+  line-height: 1.12;
+}
+
+.portal-button__label-track {
+  position: relative;
+  display: inline-block;
+  max-width: none;
   white-space: nowrap;
-  text-shadow:
-    0 1px 2px rgba(0,0,0,0.9),
-    0 0 12px color-mix(in srgb, var(--portal-accent) 40%, transparent);
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
+.portal-button__label-track--marquee {
+  animation: label-marquee var(--label-marquee-duration, 10s) linear infinite;
+}
+
+.portal-button__label-face,
+.portal-button__label-glow {
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.portal-button__label-face {
+  display: inline-block;
+  color: var(--portal-label-color, rgba(255,255,255,0.97));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.portal-button__label-glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: transparent;
+  text-shadow: 0 0 10px var(--portal-accent, #fff);
+  pointer-events: none;
+  animation: label-glow 2.8s ease-in-out infinite;
 }
 
 .portal-button__energy,
@@ -429,14 +490,9 @@ button { font: inherit; }
   display: none;
 }
 
-.portal-button:hover,
 .portal-button:focus-visible {
-  outline: none;
-  transform: translateY(-2px) scale(1.008);
-  box-shadow:
-    0 18px 38px rgba(0,0,0,0.52),
-    0 0 34px color-mix(in srgb, var(--portal-accent) 34%, transparent),
-    inset 0 0 28px rgba(255,255,255,0.07);
+  outline: 2px solid color-mix(in srgb, var(--portal-accent) 70%, white);
+  outline-offset: 2px;
 }
 
 .portal-button:disabled {
@@ -445,7 +501,7 @@ button { font: inherit; }
 }
 
 .portal-button:active {
-  transform: translateY(0) scale(0.995);
+  transform: scale(0.985);
 }
 
 .intro {
@@ -466,19 +522,102 @@ button { font: inherit; }
   transform: scale(1.025);
 }
 
+.intro--loading .intro__frame,
+.intro--loading .intro__media,
+.intro--loading .intro__title {
+  visibility: hidden;
+}
+
+.intro__loader {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.intro__loader-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-top-color: rgba(255, 214, 140, 0.95);
+  transform: translateZ(0);
+  animation: intro-spin 0.9s linear infinite;
+}
+
+.intro__frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.intro__fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: blur(28px);
+  transform: scale(1.16) translateZ(0);
+  pointer-events: none;
+}
+
+.intro__shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
 .intro__media {
   width: auto;
-  max-width: none;
-  height: 96vh;
-  max-height: 96vh;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
   object-fit: contain;
   object-position: center;
 }
 
-.intro__media--wide { width: max-content; }
+.intro__media--contained {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  align-self: center;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.intro__frame--side .intro__media--contained {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.intro__frame--band .intro__media--contained {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.intro__media--wide { width: auto; max-width: 100%; }
 
 .intro__title {
   position: absolute;
+  z-index: 3;
   inset: 0;
   display: flex;
   justify-content: center;
@@ -646,9 +785,6 @@ button { font: inherit; }
     height: auto;
     gap: 8px;
     padding: 8px 4px 10px;
-    touch-action: pan-y;
-    overscroll-behavior-y: contain;
-    -webkit-overflow-scrolling: touch;
   }
 
   .portal-button {
@@ -666,22 +802,68 @@ button { font: inherit; }
   }
 
   .portal-button__icon-shell {
-    flex-basis: 52px;
-    width: 52px;
-    height: 52px;
-    margin-left: 9px;
-    margin-right: 12px;
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    margin-left: 8px;
+    margin-right: 10px;
   }
 
   .portal-button__label {
-    font-size: 1.15rem;
     letter-spacing: 0.035em;
   }
 
   .intro__media {
-    height: 94vh;
-    max-height: 94vh;
+    height: 100%;
+    max-height: 100%;
   }
+}
+
+.launch {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.launch__copy {
+  max-width: 460px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+  line-height: 1.45;
+}
+
+.launch__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.launch__primary,
+.launch__secondary {
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.launch__primary {
+  border: 0;
+  background: linear-gradient(120deg, #6ecbff, #8d6bff);
+  color: white;
+}
+
+.launch__secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .app--android .portal-button::before {
@@ -698,6 +880,406 @@ button { font: inherit; }
   opacity: 0.32;
 }
 
+.app--inline {
+  overflow: hidden;
+  touch-action: auto;
+  overscroll-behavior: auto;
+}
+
+.app--inline .menu,
+.app--inline .menu__content,
+.app--inline .carousel,
+.app--inline .carousel__viewport,
+.app--inline .carousel__page {
+  overflow: hidden;
+}
+
+.menu__content--inline {
+  height: 100%;
+  padding: 12px 14px 10px;
+  gap: 8px;
+}
+
+.app--inline .menu__header { flex: 0 0 auto; }
+
+.app--inline .menu__eyebrow {
+  margin: 0 0 2px;
+  letter-spacing: 0.22em;
+}
+
+.app--inline .menu__title {
+  font-size: clamp(1.15rem, 4.2vw, 1.55rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app--inline .carousel__controls,
+.app--inline .subreddit-menu {
+  min-height: 0;
+}
+
+.app--inline .intro,
+.app--inline .intro__frame,
+.app--inline .intro__loader {
+  touch-action: auto;
+  overscroll-behavior: auto;
+}
+
+@media (max-height: 360px) {
+  .menu__content--inline {
+    padding: 8px 10px 6px;
+    gap: 4px;
+  }
+
+  .app--inline .menu__eyebrow { margin: 0; font-size: 0.62rem; }
+
+  .app--inline .menu__title { font-size: 1rem; }
+
+  .app--inline .carousel,
+  .app--inline .carousel__page { gap: 4px; }
+
+  .app--inline .carousel__controls { gap: 6px; }
+
+  .app--inline .carousel__arrow { width: 34px; height: 34px; }
+
+  .app--inline .subreddit-menu { min-height: 36px; }
+
+  .app--inline .portal-button__icon-shell { max-height: 40px; margin-left: 6px; margin-right: 6px; }
+}
+
+.carousel {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.carousel__viewport {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  touch-action: auto;
+  overscroll-behavior: auto;
+}
+
+.carousel__track {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  transition: transform 250ms cubic-bezier(0.22, 0.8, 0.28, 1);
+  will-change: transform;
+}
+
+.carousel__page {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.carousel__page[aria-hidden="true"] .portal-button__outline-spin {
+  animation-play-state: paused;
+}
+
+.app--inline .carousel__page .portal-button,
+.app--inline .carousel__page .portal-button--image {
+  flex: 0 0 calc((100% - (var(--inline-slots, 4) - 1) * 8px) / var(--inline-slots, 4));
+  min-height: 0;
+  height: auto;
+}
+
+.app--inline .portal-button__icon-shell {
+  flex: 0 1 auto;
+  width: auto;
+  height: 78%;
+  aspect-ratio: 1;
+  max-height: 76px;
+  margin-left: 8px;
+  margin-right: 10px;
+}
+
+.app--inline .portal-button__label { letter-spacing: 0.03em; }
+
+.carousel__controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.carousel__nav {
+  display: grid;
+  grid-template-columns: 40px auto 40px;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+}
+
+.carousel__arrow {
+  color: white;
+  cursor: pointer;
+}
+
+.carousel__arrow {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.2), transparent 55%),
+    rgba(8, 10, 24, 0.78);
+  box-shadow: 0 0 14px rgba(110, 203, 255, 0.22);
+}
+
+.carousel__arrow.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.carousel__indicator {
+  margin: 0;
+  min-width: 3.2rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.subreddit-menu {
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+  box-shadow:
+    0 0 14px rgba(232, 184, 74, 0.45),
+    0 8px 18px rgba(74, 48, 8, 0.35);
+}
+
+.subreddit-menu:focus-visible {
+  outline: 2px solid #fff1c2;
+  outline-offset: 3px;
+}
+
+.subreddit-menu:active {
+  transform: scale(0.985);
+}
+
+.subreddit-menu__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.subreddit-menu__ring::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220%;
+  aspect-ratio: 1;
+  transform: translate3d(-50%, -50%, 0);
+  background: conic-gradient(
+    from 0deg,
+    #8d6a22 0deg,
+    #ffe7a8 50deg,
+    #fff8e4 80deg,
+    #e0b44a 140deg,
+    #8d6a22 180deg,
+    #ffe7a8 240deg,
+    #fff6d4 280deg,
+    #c9963a 330deg,
+    #8d6a22 360deg
+  );
+  animation: gold-spin 3.4s linear infinite;
+}
+
+.subreddit-menu__face {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  margin: 3px;
+  min-width: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0) 40%),
+    linear-gradient(165deg, #fff6d0 0%, #f3d27a 24%, #e0b44a 50%, #f8e7b0 74%, #c9963a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(110, 68, 10, 0.28);
+}
+
+.subreddit-menu__sheen {
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: 0;
+  width: 46%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 248, 220, 0.15) 28%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(255, 248, 220, 0.15) 72%,
+    transparent 100%
+  );
+  transform: translate3d(-160%, 0, 0) skewX(-16deg);
+  animation: gold-sheen 2.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.subreddit-menu__label {
+  position: relative;
+  z-index: 1;
+  padding: 0 16px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #2c1d08;
+  text-shadow: 0 1px 0 rgba(255, 248, 226, 0.7);
+}
+
+.app--expanded .subreddit-menu {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 68px;
+}
+
+.app--expanded .subreddit-menu__label {
+  font-size: 0.95rem;
+}
+
+.app-error {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: auto;
+  touch-action: auto;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #070014, #101447 45%, #071d32);
+  color: white;
+  font-family: system-ui, sans-serif;
+}
+
+.app-error__card {
+  max-width: 620px;
+  max-height: 100%;
+  overflow: hidden;
+  width: 100%;
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.app-error h1 { margin: 0; font-size: 1.25rem; }
+
+.app-error p { margin: 8px 0 0; color: rgba(255, 255, 255, 0.75); line-height: 1.4; }
+
+.app-error__detail {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes electric-spin {
+  to { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
+}
+
+@keyframes electric-flicker {
+  0%, 100% { opacity: 1; }
+  35% { opacity: 0.4; }
+  68% { opacity: 1; }
+  82% { opacity: 0.72; }
+}
+
+@keyframes gold-spin {
+  to { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
+}
+
+@keyframes gold-sheen {
+  0%, 12% { transform: translate3d(-160%, 0, 0) skewX(-16deg); }
+  58% { transform: translate3d(240%, 0, 0) skewX(-16deg); }
+  100% { transform: translate3d(240%, 0, 0) skewX(-16deg); }
+}
+
+@keyframes intro-spin {
+  to { transform: translateZ(0) rotate(360deg); }
+}
+
+@keyframes label-glow {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes label-marquee {
+  0%, 14% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  58%, 70% {
+    transform: translate3d(var(--label-shift, 0px), 0, 0);
+    opacity: 1;
+  }
+  78% {
+    transform: translate3d(var(--label-shift, 0px), 0, 0);
+    opacity: 0;
+  }
+  78.2%, 82% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  92%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .menu__petal { animation: none !important; opacity: 0 !important; }
 
@@ -705,5 +1287,43 @@ button { font: inherit; }
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .portal-button--electric .portal-button__outline-spin { display: none; }
+
+  .portal-button--electric .portal-button__outline {
+    background: color-mix(in srgb, var(--portal-accent) 88%, white);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--portal-accent) 40%, transparent);
+  }
+
+  .subreddit-menu__sheen,
+  .subreddit-menu__ring::before,
+  .portal-button__label-glow,
+  .portal-button__label-track--marquee,
+  .intro__loader-ring {
+    animation: none !important;
+  }
+
+  .subreddit-menu__sheen,
+  .portal-button__label-glow {
+    opacity: 0;
+  }
+
+  .portal-button__label-track,
+  .portal-button__label-track--marquee {
+    transform: none !important;
+    opacity: 1 !important;
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .portal-button__label-face {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
